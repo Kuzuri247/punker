@@ -4,7 +4,9 @@ import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { cn } from "@/lib/utils";
 
-const geist = Geist({subsets:['latin'],variable:'--font-sans'})
+import { AuthProvider, ClerkSetupBanner } from "@/components/auth/auth-provider"
+
+const geist = Geist({ subsets: ["latin"], variable: "--font-sans" })
 
 const fontMono = Geist_Mono({
   subsets: ["latin"],
@@ -22,8 +24,13 @@ export default function RootLayout({
       suppressHydrationWarning
       className={cn("antialiased", fontMono.variable, "font-sans", geist.variable)}
     >
-      <body>
-        <ThemeProvider>{children}</ThemeProvider>
+      <body className="min-h-screen bg-background text-foreground antialiased selection:bg-emerald-500/30 selection:text-emerald-200">
+        <ThemeProvider>
+          <AuthProvider>
+            <ClerkSetupBanner />
+            {children}
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   )
