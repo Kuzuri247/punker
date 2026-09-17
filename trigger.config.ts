@@ -58,7 +58,7 @@ const daytonaExternal: BuildExtension = {
 };
 
 export default defineConfig({
-  project: "proj_mrgzxrrrlsqxhkxnkflz",
+  project: "proj_aiuuzuufkwymcvwrdrjx",
   runtime: "node-24",
   logLevel: "log",
   // The max compute seconds a task is allowed to run. If the task run exceeds this duration, it will be stopped.

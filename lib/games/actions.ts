@@ -1,6 +1,5 @@
 "use server"
 
-import { anthropic } from "@ai-sdk/anthropic"
 import { auth } from "@clerk/nextjs/server"
 import * as Sentry from "@sentry/nextjs"
 import { generateText } from "ai"
@@ -18,10 +17,11 @@ import {
   type GameModelId,
   isGameModelId,
 } from "@/lib/games/model-catalog"
+import { google } from "@/lib/games/models"
 import { truncateTitle } from "@/lib/games/title"
 import { describeError, elapsed } from "@/lib/observability"
 
-const TITLE_MODEL = "claude-haiku-4-5"
+const TITLE_MODEL = "gemini-3.5-flash-lite"
 
 /**
  * Names a game after the prompt it was created from.
@@ -36,7 +36,7 @@ async function generateTitle(prompt: string) {
 
   try {
     const { text } = await generateText({
-      model: anthropic(TITLE_MODEL),
+      model: google(TITLE_MODEL),
       instructions:
         "You name games from the prompt that created them. Reply with a title " +
         "of at most four words in title case. No quotes, no punctuation at the " +
