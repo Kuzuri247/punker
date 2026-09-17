@@ -32,7 +32,10 @@ export async function createGameSandbox(
   const startedAt = performance.now()
   const { folders, files } = await readRuntimeFiles(GAME_DIR)
 
-  const sandbox = await daytona.create({ labels: { gameId } })
+  const sandbox = await daytona.create({
+    labels: { gameId },
+    autoStopInterval: 15,
+  })
 
   await sandbox.fs.createFolder(GAME_DIR, "755")
 

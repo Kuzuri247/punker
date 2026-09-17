@@ -1,4 +1,4 @@
-import { chat, upsertIncomingMessage } from "@trigger.dev/sdk/ai"
+import { chat } from "@trigger.dev/sdk/ai"
 import { stepCountIs, streamText } from "ai"
 import { z } from "zod"
 
@@ -11,9 +11,8 @@ import { priceStep } from "@/lib/billing/pricing"
 import { createGameSandbox } from "@/lib/daytona/utils"
 import { gameModelSettings } from "@/lib/games/agent"
 import {
-  loadGameMessages,
+  gameTranscriptStorage,
   loadGameOrgId,
-  saveGameMessages,
   saveGameTurn,
 } from "@/lib/games/chat-store"
 import { gameInstructions } from "@/lib/games/instructions"
@@ -43,8 +42,8 @@ const MAX_STEPS = 48
  * A game's chat thread, run as one long-lived task per conversation.
  *
  * A game owns exactly one thread and the chat id is the game id, so the
- * `games` row stays the source of truth for history: `hydrateMessages` reads it
- * back at the top of every turn instead of trusting the copy the browser holds.
+ * `games` row stays the source of truth for history: `storage` reads it
+ * back at the top of every run and persists each turn's changes durable to Postgres.
  *
  * Authorization happens before a session can exist, in the server actions in
  * `@/lib/games/chat-actions` — there is no Clerk session in here to scope by.
@@ -52,42 +51,7 @@ const MAX_STEPS = 48
 export const gameChat = chat.agent({
   id: "game-chat",
   clientDataSchema: gameClientDataSchema,
-  hydrateMessages: async ({ chatId, trigger, incomingMessages }) => {
-    const startedAt = performance.now()
-    const stored = await loadGameMessages(chatId)
-
-    // Appends a genuinely new user message and no-ops otherwise. A new game is
-    // created with its opening prompt already stored, and the client replays
-    // that same message to ask for the first reply — this dedupes it by id.
-    //
-    // Nothing is written here, deliberately. The turn that answers an
-    // `ask_player` question arrives as a state advance on a message this row
-    // already holds, which is exactly the case this no-ops on, and the runtime
-    // only overlays that advance onto the chain *after* this hook returns — so
-    // a write from here could never carry the answer. `onTurnStart` persists
-    // the merged chain instead, which covers both cases in one statement.
-    const appended = upsertIncomingMessage(stored, {
-      trigger,
-      incomingMessages,
-    })
-
-    // The top of every turn, and the one place the thread's size is visible.
-    // Message *counts*, never message content: the thread is the player's
-    // prompts and the agent's game source, both of which stay out of Sentry.
-    //
-    // `appended: false` on what should be a new turn is the signature of the
-    // dedupe swallowing a real message, which would look to the player like the
-    // agent replying to the message before theirs.
-    logger.info(logger.fmt`Chat turn starting for game ${chatId}`, {
-      "game.id": chatId,
-      "chat.stored_messages": stored.length,
-      "chat.incoming_messages": incomingMessages.length,
-      "chat.appended_incoming": appended,
-      duration_ms: elapsed(startedAt),
-    })
-
-    return stored
-  },
+  storage: gameTranscriptStorage,
   // Fires once per game, on the first message of its thread — so the sandbox
   // is created exactly once and is already seeded before `run` streams a reply.
   onChatStart: async ({ chatId }) => {
@@ -107,20 +71,9 @@ export const gameChat = chat.agent({
       throw error
     }
   },
-  // Every turn, and the last point before it starts streaming: the thread is
-  // written down here, and then the turn is either paid for or refused.
-  onTurnStart: async ({ chatId, uiMessages }) => {
-    // The thread as the runtime has it, which on the turn that answers an
-    // `ask_player` question is the only place the player's answer exists yet:
-    // the browser ships it as a state advance on a message this row already
-    // holds, and the runtime overlays it between `hydrateMessages` and here.
-    //
-    // Written before the turn rather than after it, because the turn it opens
-    // is a build that runs for minutes — and until this lands, a reload reads
-    // the row back and puts the same question to the player a second time. A
-    // turn that is refused below, or that dies part way, never reaches
-    // `onTurnComplete` and would otherwise leave the answer nowhere.
-    await saveGameMessages({ gameId: chatId, messages: uiMessages })
+  // Every turn, and the last point before it starts streaming: check credits.
+  // The runtime TranscriptStorage has already persisted incoming messages at turn-start.
+  onTurnStart: async ({ chatId }) => {
 
     // Checked on every turn, including the first turn of a continuation run —
     // which is where `onChatStart` would have missed it. The session-start
@@ -269,6 +222,7 @@ export const gameChat = chat.agent({
             orgId,
             responseId: response.id,
             amount: priceStep({ modelId, usage }),
+            agentRole: "studio",
           })
         } catch (error) {
           // Deliberately swallowed. This runs between steps of a turn the

@@ -1,5 +1,6 @@
 import type { Instructions } from "ai"
 
+import { specialistInstructions } from "@/lib/games/agents/specialists"
 import { engine } from "./engine"
 import { runtime } from "./runtime"
 import { workflow } from "./workflow"
@@ -10,13 +11,14 @@ import { workflow } from "./workflow"
  * Kept as separate blocks rather than one string so each stays editable on its
  * own; the model provider concatenates them into the request's system
  * field, so the model reads them as one prompt in this order — what the job is,
- * then where it is done, then what it is done with.
+ * then how the specialist team collaborates, then where it is done, then what it is done with.
  *
  * `satisfies` rather than an annotation: `Instructions` also admits a bare
  * string, and the array form is what `streamText` is handed here.
  */
 export const gameInstructions = [
   { role: "system", content: workflow },
+  { role: "system", content: specialistInstructions },
   { role: "system", content: runtime },
   { role: "system", content: engine },
 ] satisfies Instructions

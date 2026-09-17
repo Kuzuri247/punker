@@ -75,6 +75,7 @@ export async function chargeStep({
   orgId: string
   responseId: string
   amount: bigint
+  agentRole?: string
 }): Promise<void> {
   // A step that cost nothing — no usage reported, or a turn stopped before the
   // model ran — is not a row worth writing.
@@ -84,7 +85,11 @@ export async function chargeStep({
 
   await db
     .insert(creditLedger)
-    .values({ orgId, entryKey: `step:${responseId}`, amount: -amount })
+    .values({
+      orgId,
+      entryKey: `step:${responseId}`,
+      amount: -amount,
+    })
     .onConflictDoNothing()
 }
 

@@ -275,7 +275,7 @@ export function ChatThread({
                       <MessageAvatar className="size-8 self-start rounded-lg bg-transparent">
                         <Image
                           src="/logo.svg"
-                          alt="Sandbox"
+                          alt="Punker"
                           width={32}
                           height={32}
                           className="size-8"

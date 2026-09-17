@@ -1,10 +1,12 @@
 import type { UIMessage } from "ai"
+import type { TranscriptStorage } from "@trigger.dev/sdk/ai"
 import { eq } from "drizzle-orm"
 
 // Imported straight from `./client` rather than `@/lib/db`: this module runs
 // inside the Trigger.dev worker, where the `server-only` marker on the `@/lib/db`
 // entry would throw.
 import { db, games } from "@/lib/db/client"
+import { describeError, logger } from "@/lib/observability"
 
 /**
  * A game's stored chat thread.
@@ -21,7 +23,7 @@ export async function loadGameMessages(gameId: string): Promise<UIMessage[]> {
     .where(eq(games.id, gameId))
     .limit(1)
 
-  return game?.messages ?? []
+  return (game?.messages as UIMessage[]) ?? []
 }
 
 /**
@@ -45,9 +47,6 @@ export async function loadGameOrgId(
 
 /**
  * Replaces a game's chat thread.
- *
- * The thread is stored whole on every turn, so the caller passes the complete
- * message list rather than an append.
  */
 export async function saveGameMessages({
   gameId,
@@ -61,10 +60,6 @@ export async function saveGameMessages({
 
 /**
  * Replaces a game's chat thread and the stream cursor for it.
- *
- * One statement, so the two can't diverge: a reload landing between separate
- * writes would resume from a cursor that points past messages the row doesn't
- * have yet, and replay the assistant turn on top of itself.
  */
 export async function saveGameTurn({
   gameId,
@@ -81,4 +76,59 @@ export async function saveGameTurn({
     .update(games)
     .set({ messages, chatAccessToken, chatLastEventId })
     .where(eq(games.id, gameId))
+}
+
+/**
+ * Trigger.dev TranscriptStorage implementation for Punker games.
+ *
+ * The runtime calls `load` at run boot and `save` after every durable change
+ * (turn-start, turn-complete, error, compaction). Storing the conversation as
+ * a document in `games.messages` ensures that the database is the source of truth,
+ * with zero custom recovery or compaction logic required.
+ */
+export const gameTranscriptStorage: TranscriptStorage = {
+  async load<TUIMessage extends UIMessage = UIMessage>({
+    chatId,
+  }: {
+    chatId: string
+  }) {
+    const [game] = await db
+      .select({
+        messages: games.messages,
+        chatLastEventId: games.chatLastEventId,
+      })
+      .from(games)
+      .where(eq(games.id, chatId))
+      .limit(1)
+
+    return {
+      messages: (game?.messages as unknown as TUIMessage[]) ?? [],
+      state: null,
+      cursors: {
+        lastOutEventId: game?.chatLastEventId ?? undefined,
+      },
+    }
+  },
+
+  async save({ chatId }, changeset) {
+    const messages = changeset.transcript.entries.map((e) => e.message)
+    const lastOutEventId = changeset.cursors?.lastOutEventId
+
+    try {
+      await db
+        .update(games)
+        .set({
+          messages,
+          ...(lastOutEventId ? { chatLastEventId: lastOutEventId } : {}),
+        })
+        .where(eq(games.id, chatId))
+    } catch (error) {
+      logger.error(logger.fmt`Could not persist transcript for game ${chatId}`, {
+        "game.id": chatId,
+        "chat.messages": messages.length,
+        ...describeError(error),
+      })
+      throw error
+    }
+  },
 }

@@ -49,7 +49,7 @@ Sentry.init({
       return null
     }
 
-    log.attributes = { ...log.attributes, "service.name": "sandbox-web" }
+    log.attributes = { ...log.attributes, "service.name": "punker-web" }
 
     return log
   },
