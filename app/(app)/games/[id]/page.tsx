@@ -28,13 +28,10 @@ export default async function GamePage({
   const { model } = await searchParams
 
   return (
-    <div className="flex h-svh flex-col">
-      <header className="flex h-12 shrink-0 items-center justify-between gap-2 border-b px-4">
-        <span className="truncate font-heading text-sm font-medium">
-          {game.title}
-        </span>
+    <div className="relative flex h-svh flex-col">
+      <div className="fixed top-3 right-3 z-30">
         <GameMenu gameId={game.id} title={game.title} />
-      </header>
+      </div>
       <GameChat
         gameId={game.id}
         // What the thread opens with. It goes stale as the turn spends, which is
@@ -50,9 +47,9 @@ export default async function GamePage({
         initialSession={
           game.chatAccessToken
             ? {
-                publicAccessToken: game.chatAccessToken,
-                lastEventId: game.chatLastEventId ?? undefined,
-              }
+              publicAccessToken: game.chatAccessToken,
+              lastEventId: game.chatLastEventId ?? undefined,
+            }
             : undefined
         }
       />

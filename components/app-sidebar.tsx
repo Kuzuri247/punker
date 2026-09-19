@@ -6,6 +6,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
+import { ThemeToggle } from "@/components/theme-toggle"
 import { GameMenu } from "@/components/game-menu"
 import { Empty, EmptyDescription } from "@/components/ui/empty"
 import {
@@ -32,14 +33,14 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar"
 import { formatCredits } from "@/lib/billing/format"
-import type { Game } from "@/lib/db/schema"
+import type { GameSummary } from "@/lib/games/queries"
 
 export function AppSidebar({
   games,
   credits,
   ...props
 }: React.ComponentProps<typeof Sidebar> & {
-  games: Game[]
+  games: GameSummary[]
   credits: bigint
 }) {
   const pathname = usePathname()
@@ -192,7 +193,10 @@ export function AppSidebar({
               }}
             />
           </div>
-          <UserButton />
+          <div className="flex items-center gap-1">
+            <ThemeToggle />
+            <UserButton />
+          </div>
         </div>
       </SidebarFooter>
     </Sidebar>

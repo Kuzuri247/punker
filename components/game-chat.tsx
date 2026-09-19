@@ -37,17 +37,10 @@ export function GameChat({
   // just a new fetch.
   const [previewRevision, setPreviewRevision] = useState(0)
 
-  // The sandbox is created on the thread's first turn, so a game opened before
-  // then has nothing to preview — but by the time that turn finishes it does,
-  // and it holds the game the user just asked for. Server-rendered `sandboxId`
-  // is therefore only the starting answer, not the standing one.
-  const [hasSandbox, setHasSandbox] = useState(sandboxId !== null)
-
   const router = useRouter()
 
   const handleTurnComplete = useCallback(() => {
     setPreviewRevision((revision) => revision + 1)
-    setHasSandbox(true)
 
     // The turn just spent credits, and the sidebar that shows the balance is
     // rendered by the layout above this page — server-side, once, when the
@@ -96,25 +89,18 @@ export function GameChat({
         >
           {thread}
         </ResizablePanel>
-        {/* The sandbox is created on the thread's first turn, so until then
-            there is nothing to show beside it — and a handle against an empty
-            panel is worse than no split at all. */}
-        {hasSandbox && (
-          <>
-            <ResizableHandle withHandle />
-            <ResizablePanel
-              defaultSize="60"
-              minSize="30"
-              className="flex h-full flex-col"
-            >
-              <ChatPreview
-                key={gameId}
-                gameId={gameId}
-                revision={previewRevision}
-              />
-            </ResizablePanel>
-          </>
-        )}
+        <ResizableHandle withHandle />
+        <ResizablePanel
+          defaultSize="60"
+          minSize="30"
+          className="flex h-full flex-col"
+        >
+          <ChatPreview
+            key={gameId}
+            gameId={gameId}
+            revision={previewRevision}
+          />
+        </ResizablePanel>
       </ResizablePanelGroup>
     </div>
   )

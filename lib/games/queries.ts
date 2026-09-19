@@ -5,10 +5,20 @@ import { and, desc, eq } from "drizzle-orm"
 
 import { db, games, type Game } from "@/lib/db"
 
+export type GameSummary = {
+  id: string
+  orgId: string
+  title: string
+  sandboxId: string | null
+  createdAt: Date
+  updatedAt: Date
+}
+
 /**
  * Games belonging to the caller's active organization, newest first.
+ * Selects only metadata to avoid transferring multi-megabyte message history.
  */
-export async function listGames(): Promise<Game[]> {
+export async function listGames(): Promise<GameSummary[]> {
   const { orgId } = await auth()
 
   // Every game is owned by an org, so without an active one there is nothing
@@ -18,7 +28,14 @@ export async function listGames(): Promise<Game[]> {
   }
 
   return db
-    .select()
+    .select({
+      id: games.id,
+      orgId: games.orgId,
+      title: games.title,
+      sandboxId: games.sandboxId,
+      createdAt: games.createdAt,
+      updatedAt: games.updatedAt,
+    })
     .from(games)
     .where(eq(games.orgId, orgId))
     .orderBy(desc(games.createdAt))

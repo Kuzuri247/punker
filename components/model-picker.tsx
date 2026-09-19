@@ -1,6 +1,6 @@
 "use client"
 
-import { ChevronDownIcon, GripIcon } from "lucide-react"
+import { ChevronDownIcon, SparklesIcon } from "lucide-react"
 
 import {
   DropdownMenu,
@@ -38,10 +38,9 @@ export function ModelPicker({
     <DropdownMenu>
       <DropdownMenuTrigger
         render={
-          <InputGroupButton>
-            <GripIcon />
-            {selected?.name ?? modelId}
-            <ChevronDownIcon />
+          <InputGroupButton className="rounded-full py-1 text-xs text-muted-foreground hover:text-foreground">
+            <span className="font-sans font-medium">{selected?.name ?? modelId}</span>
+            <ChevronDownIcon className="size-3 opacity-60" />
           </InputGroupButton>
         }
       />

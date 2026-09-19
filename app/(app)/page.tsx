@@ -1,34 +1,25 @@
 import { auth } from "@clerk/nextjs/server"
-import Image from "next/image"
+import { SparklesIcon } from "lucide-react"
 
 import { NewGameComposer } from "@/components/new-game-composer"
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty"
 
 export default async function Page() {
   await auth.protect({ unauthenticatedUrl: "/sign-in" })
 
   return (
-    <div className="flex min-h-svh flex-col items-center justify-center gap-6">
-      <Empty className="flex-none">
-        <EmptyHeader>
-          <EmptyMedia>
-            <Image src="/logo.svg" alt="Logo" width={48} height={48} />
-          </EmptyMedia>
-          <EmptyTitle className="text-2xl">
-            What's in your mind today?
-          </EmptyTitle>
-        </EmptyHeader>
-        <EmptyContent className="max-w-2xl gap-6">
+    <div className="flex min-h-svh flex-col items-center justify-center px-4 py-12">
+      <div className="mx-auto flex w-full max-w-2xl flex-col items-center gap-8 text-center">
+        <div className="flex flex-col items-center gap-3">
+
+          <h1 className="font-heading text-3xl font-medium tracking-tight text-foreground sm:text-4xl">
+            What&apos;s on your mind today?
+          </h1>
+        </div>
+
+        <div className="w-full space-y-4">
           <NewGameComposer />
-        </EmptyContent>
-      </Empty>
+        </div>
+      </div>
     </div>
   )
 }

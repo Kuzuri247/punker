@@ -1,12 +1,12 @@
 "use client"
 
 import * as Sentry from "@sentry/nextjs"
+import { Sparkles } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
-
-import { Spinner } from "@/components/ui/spinner"
 
 type Preview =
   | { status: "loading" }
+  | { status: "building" }
   | { status: "ready"; url: string; revision: number }
   | { status: "error"; message: string }
 
@@ -99,6 +99,11 @@ export function ChatPreview({
           signal: controller.signal,
         })
         const body = await response.json()
+
+        if (response.status === 409) {
+          setPreview({ status: "building" })
+          return
+        }
 
         if (!response.ok) {
           throw new Error(body.error ?? "Preview is unavailable")
@@ -215,20 +220,17 @@ export function ChatPreview({
     }
   }, [ready, gameId])
 
-  if (preview.status === "loading") {
-    return (
-      <div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
-        <Spinner />
-        Starting preview…
-      </div>
-    )
+  if (preview.status === "loading" || preview.status === "building") {
+    return <MinimalistCanvasLoader status={preview.status} />
   }
 
   if (preview.status === "error") {
     return (
-      <p className="flex h-full items-center justify-center p-4 text-center text-sm text-muted-foreground">
-        {preview.message}
-      </p>
+      <div className="flex h-full flex-col items-center justify-center p-6 text-center">
+        <p className="text-sm text-muted-foreground max-w-sm leading-relaxed">
+          {preview.message}
+        </p>
+      </div>
     )
   }
 
@@ -247,3 +249,51 @@ export function ChatPreview({
     />
   )
 }
+
+function MinimalistCanvasLoader({
+  status,
+}: {
+  status: "loading" | "building"
+}) {
+  return (
+    <div className="relative flex h-full w-full flex-col items-center justify-center overflow-hidden bg-secondary/15 p-6 select-none">
+      {/* Subtle perspective grid lines */}
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.035] dark:opacity-[0.06]"
+        style={{
+          backgroundImage: `
+            linear-gradient(to right, currentColor 1px, transparent 1px),
+            linear-gradient(to bottom, currentColor 1px, transparent 1px)
+          `,
+          backgroundSize: "32px 32px",
+          transform: "perspective(600px) rotateX(48deg) translateY(-15%)",
+          transformOrigin: "center center",
+        }}
+      />
+
+      {/* Ambient soft glow */}
+      <div className="pointer-events-none absolute size-72 rounded-full bg-gradient-to-tr from-sky-400/10 via-indigo-400/10 to-transparent blur-3xl" />
+
+      {/* Central minimal loader */}
+      <div className="relative z-10 flex flex-col items-center gap-3 text-center animate-in fade-in duration-300">
+        <div className="relative flex size-10 items-center justify-center rounded-2xl border border-border/50 bg-secondary/40 shadow-xs">
+          <Sparkles className="size-4 text-sky-400 animate-pulse" />
+        </div>
+
+        <div className="flex flex-col items-center gap-1">
+          <span className="text-[14px] font-medium text-foreground tracking-tight">
+            {status === "building"
+              ? "Building 3D Scene"
+              : "Connecting Live Preview"}
+          </span>
+          <span className="text-[12px] text-muted-foreground max-w-[260px] leading-relaxed">
+            {status === "building"
+              ? "Punker Studio is preparing assets, camera, and game loop…"
+              : "Loading sandbox environment…"}
+          </span>
+        </div>
+      </div>
+    </div>
+  )
+}
+

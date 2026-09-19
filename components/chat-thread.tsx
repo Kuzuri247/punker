@@ -19,16 +19,17 @@ import {
   CheckIcon,
   CircleAlertIcon,
   CircleQuestionMarkIcon,
+  SparklesIcon,
 } from "lucide-react"
-import Image from "next/image"
 import Link from "next/link"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 import { ChatComposer } from "@/components/chat-composer"
+import { StepsDropdown } from "@/components/studio/steps-dropdown"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Bubble, BubbleContent } from "@/components/ui/bubble"
 import { Marker, MarkerContent, MarkerIcon } from "@/components/ui/marker"
-import { Message, MessageAvatar, MessageContent } from "@/components/ui/message"
+import { Message, MessageContent } from "@/components/ui/message"
 import {
   MessageScroller,
   MessageScrollerButton,
@@ -61,6 +62,56 @@ import type { gameChat } from "@/trigger/chat"
 
 /** The tool the agent asks with, rather than one it edits the game with. */
 const ASK_PLAYER = "ask_player"
+
+type PartGroup =
+  | { type: "text"; text: string; key: string | number }
+  | { type: "ask_player"; part: ToolUIPart | DynamicToolUIPart }
+  | { type: "tools"; parts: Array<ToolUIPart | DynamicToolUIPart>; key: string }
+
+function groupMessageParts(parts: UIMessage["parts"]): PartGroup[] {
+  const groups: PartGroup[] = []
+  let currentTools: Array<ToolUIPart | DynamicToolUIPart> = []
+
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i]
+
+    if (part.type === "text") {
+      if (currentTools.length > 0) {
+        groups.push({
+          type: "tools",
+          parts: currentTools,
+          key: `tools-${currentTools[0].toolCallId}`,
+        })
+        currentTools = []
+      }
+      groups.push({ type: "text", text: part.text, key: `text-${i}` })
+    } else if (isToolUIPart(part)) {
+      if (getToolName(part) === ASK_PLAYER) {
+        if (currentTools.length > 0) {
+          groups.push({
+            type: "tools",
+            parts: currentTools,
+            key: `tools-${currentTools[0].toolCallId}`,
+          })
+          currentTools = []
+        }
+        groups.push({ type: "ask_player", part })
+      } else {
+        currentTools.push(part)
+      }
+    }
+  }
+
+  if (currentTools.length > 0) {
+    groups.push({
+      type: "tools",
+      parts: currentTools,
+      key: `tools-${currentTools[0].toolCallId}`,
+    })
+  }
+
+  return groups
+}
 
 export function ChatThread({
   gameId,
@@ -270,17 +321,11 @@ export function ChatThread({
             <MessageScrollerContent className="mx-auto w-full max-w-3xl px-4 py-8">
               {messages.map((message) => (
                 <MessageScrollerItem key={message.id} messageId={message.id}>
-                  <Message align={message.role === "user" ? "end" : "start"}>
+                  <Message align={message.role === "user" ? "end" : "start"} className="gap-3">
                     {message.role === "assistant" && (
-                      <MessageAvatar className="size-8 self-start rounded-lg bg-transparent">
-                        <Image
-                          src="/logo.svg"
-                          alt="Punker"
-                          width={32}
-                          height={32}
-                          className="size-8"
-                        />
-                      </MessageAvatar>
+                      <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-sky-400/15 to-indigo-400/15 text-sky-400 self-start mt-0.5">
+                        <SparklesIcon className="size-3.5" />
+                      </div>
                     )}
                     <MessageContent>
                       <Bubble
@@ -288,36 +333,35 @@ export function ChatThread({
                           message.role === "user" ? "secondary" : "ghost"
                         }
                         align={message.role === "user" ? "end" : "start"}
+                        className={cn(
+                          message.role === "user" &&
+                            "rounded-2xl bg-secondary/80 px-4 py-2 text-[15px] font-normal text-foreground"
+                        )}
                       >
-                        {/* A turn arrives as alternating text and tool parts,
-                            one per step, so they stack rather than run together
-                            on one line. */}
                         <BubbleContent className="flex flex-col items-start gap-2">
-                          {message.parts.map((part, index) => {
-                            if (part.type === "text") {
-                              return <span key={index}>{part.text}</span>
+                          {groupMessageParts(message.parts).map((group) => {
+                            if (group.type === "text") {
+                              return (
+                                <span
+                                  key={group.key}
+                                  className="text-[15px] font-normal leading-relaxed text-foreground/90 text-pretty"
+                                >
+                                  {group.text}
+                                </span>
+                              )
                             }
 
-                            // The one tool the player answers rather than
-                            // the sandbox: it gets a question card, not a
-                            // line in the log.
-                            if (
-                              isToolUIPart(part) &&
-                              getToolName(part) === ASK_PLAYER
-                            ) {
+                            if (group.type === "ask_player") {
                               return (
                                 <AskPlayerCard
-                                  key={part.toolCallId}
-                                  part={part}
-                                  // Answerable only on the last message, the
-                                  // only one `addToolOutput` writes to. An
-                                  // older card is history and renders as such.
+                                  key={group.part.toolCallId}
+                                  part={group.part}
                                   onAnswer={
                                     message.id === lastMessage?.id
                                       ? (option) =>
                                           void addToolOutput({
                                             tool: ASK_PLAYER,
-                                            toolCallId: part.toolCallId,
+                                            toolCallId: group.part.toolCallId,
                                             output: {
                                               optionId: option.id,
                                               label: option.label,
@@ -329,14 +373,11 @@ export function ChatThread({
                               )
                             }
 
-                            // Covers both halves of a call: the part starts as
-                            // the tool call and becomes the result in place, so
-                            // one marker tracks it from start to finish.
-                            if (isToolUIPart(part)) {
+                            if (group.type === "tools") {
                               return (
-                                <ToolCallMarker
-                                  key={part.toolCallId}
-                                  part={part}
+                                <StepsDropdown
+                                  key={group.key}
+                                  parts={group.parts}
                                 />
                               )
                             }
@@ -354,6 +395,15 @@ export function ChatThread({
           <MessageScrollerButton />
         </MessageScroller>
       </MessageScrollerProvider>
+
+      {/* Subtle Gemini-style generating pulse */}
+      {(status === "submitted" || status === "streaming") && (
+        <div className="mx-auto flex w-full max-w-3xl items-center gap-2 px-4 pb-2 text-xs text-muted-foreground">
+          <SparklesIcon className="size-3.5 animate-pulse text-sky-400" />
+          <span>Generating…</span>
+        </div>
+      )}
+
       <div className="mx-auto flex w-full max-w-3xl shrink-0 flex-col gap-3 px-4 pb-4">
         {/* Two ways to arrive here, and the balance is checked first because it
             is the one that knows *why*: a turn refused before it started for

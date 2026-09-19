@@ -62,7 +62,7 @@ export function ChatComposer({
 
   return (
     <form onSubmit={handleSubmit} className="w-full">
-      <InputGroup className="bg-popover">
+      <InputGroup className="rounded-2xl border-border/60 bg-secondary/35 p-1.5 shadow-xs transition-all focus-within:border-sky-500/40 focus-within:ring-1 focus-within:ring-sky-500/20">
         <InputGroupTextarea
           name="prompt"
           value={value}
@@ -71,29 +71,29 @@ export function ChatComposer({
           disabled={disabled}
           placeholder={placeholder}
           rows={1}
-          className="field-sizing-content max-h-48 min-h-10"
+          className="field-sizing-content max-h-48 min-h-11 px-3 pt-2 text-[15px] placeholder:text-muted-foreground/60"
         />
-        <InputGroupAddon align="block-end">
+        <InputGroupAddon align="block-end" className="px-1.5 pt-1">
           <ModelPicker modelId={modelId} onModelChange={onModelChange} />
           {/* Base UI buttons default to `type="button"`, so only send opts in. */}
           {canStop ? (
             <Button
-              size="icon-lg"
+              size="icon"
               onClick={onStop}
               aria-label="Stop generating"
-              className="ml-auto rounded-full"
+              className="ml-auto size-8 rounded-full bg-foreground text-background hover:bg-foreground/90 transition-transform active:scale-95"
             >
-              <SquareIcon className="fill-current" />
+              <SquareIcon className="size-3.5 fill-current" />
             </Button>
           ) : (
             <Button
               type="submit"
-              size="icon-lg"
+              size="icon"
               disabled={!canSubmit}
               aria-label="Send message"
-              className="ml-auto rounded-full"
+              className="ml-auto size-8 rounded-full bg-foreground text-background hover:bg-foreground/90 disabled:opacity-30 transition-transform active:scale-95"
             >
-              <ArrowUpIcon />
+              <ArrowUpIcon className="size-4" />
             </Button>
           )}
         </InputGroupAddon>

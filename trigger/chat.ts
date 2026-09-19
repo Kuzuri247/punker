@@ -1,5 +1,5 @@
 import { chat } from "@trigger.dev/sdk/ai"
-import { stepCountIs, streamText } from "ai"
+import { stepCountIs } from "ai"
 import { z } from "zod"
 
 import {
@@ -160,7 +160,7 @@ export const gameChat = chat.agent({
   // only passed there: history re-converted at the top of a later turn needs
   // the same set to make sense of the tool calls already in it.
   tools: ({ chatId }) => createGameTools(chatId),
-  run: async ({ messages, tools, signal, clientData, chatId }) => {
+  run: async ({ messages, tools, signal, clientData, chatId, streamText }) => {
     // Read per turn rather than fixed for the thread, so switching models
     // mid-conversation takes effect on the next message and carries the history
     // with it. Named here rather than inline because the same choice decides
@@ -241,6 +241,9 @@ export const gameChat = chat.agent({
             }
           )
         }
+
+        // Gentle pacing between tool-loop steps to smooth out Free Tier RPM consumption
+        await new Promise((resolve) => setTimeout(resolve, 1200))
       },
     })
   },

@@ -35,6 +35,7 @@ export async function createGameSandbox(
   const sandbox = await daytona.create({
     labels: { gameId },
     autoStopInterval: 15,
+    autoArchiveInterval: 2880,
   })
 
   await sandbox.fs.createFolder(GAME_DIR, "755")
@@ -326,3 +327,40 @@ async function serverResponds(sandbox: Sandbox, retries = 0): Promise<boolean> {
 
   return exitCode === 0
 }
+
+/**
+ * Manually pauses a running sandbox to eliminate idle compute fees.
+ */
+export async function pauseGameSandbox(sandboxId: string): Promise<void> {
+  try {
+    const sandbox = await daytona.get(sandboxId)
+    if (sandbox.state === "started") {
+      await sandbox.stop()
+      logger.info(logger.fmt`Paused idle sandbox ${sandboxId}`)
+    }
+  } catch (error) {
+    logger.warn(
+      logger.fmt`Could not pause sandbox ${sandboxId}`,
+      describeError(error)
+    )
+  }
+}
+
+/**
+ * Archives a game's sandbox to cold disk storage when inactive for prolonged periods.
+ */
+export async function archiveGameSandbox(sandboxId: string): Promise<void> {
+  try {
+    const sandbox = await daytona.get(sandboxId)
+    if (sandbox.state !== "destroyed") {
+      await sandbox.archive()
+      logger.info(logger.fmt`Archived sandbox ${sandboxId} to cold storage`)
+    }
+  } catch (error) {
+    logger.warn(
+      logger.fmt`Could not archive sandbox ${sandboxId}`,
+      describeError(error)
+    )
+  }
+}
+

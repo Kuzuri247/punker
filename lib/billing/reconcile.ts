@@ -106,10 +106,28 @@ function grantsFor(orgId: string, item: BillingSubscriptionItem) {
   const months =
     monthsElapsed(new Date(item.createdAt), new Date(paidThrough(item))) + 1
 
+  // Dynamic credit grant matching the subscription tier:
+  // Studio Pro ($49/mo) -> $70.00 credits
+  // Creator / Builder ($19/mo) -> $25.00 credits
+  let monthlyGrant = 10n * DOLLAR
+  const planSlug = item.plan.slug?.toLowerCase() || ""
+  const planName = item.plan.name?.toLowerCase() || ""
+
+  if (planSlug.includes("studio") || planName.includes("studio")) {
+    monthlyGrant = 70n * DOLLAR
+  } else if (
+    planSlug.includes("creator") ||
+    planName.includes("creator") ||
+    planSlug.includes("builder") ||
+    planName.includes("builder")
+  ) {
+    monthlyGrant = 25n * DOLLAR
+  }
+
   return Array.from({ length: Math.max(months, 0) }, (_, index) => ({
     orgId,
     entryKey: `subscription:${item.id}:month:${index}`,
-    amount: MONTHLY_GRANT,
+    amount: monthlyGrant,
   }))
 }
 
