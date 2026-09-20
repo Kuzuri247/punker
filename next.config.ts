@@ -3,8 +3,12 @@ import type { NextConfig } from "next"
 
 const nextConfig: NextConfig = {
   devIndicators: false,
+  serverExternalPackages: ["pg-cloudflare"],
   outputFileTracingIncludes: {
-    "/*": ["./node_modules/@opentelemetry/api/**/*"],
+    "/*": [
+      "./node_modules/@opentelemetry/api/**/*",
+      "./node_modules/pg-cloudflare/**/*",
+    ],
   },
 }
 

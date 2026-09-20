@@ -5,7 +5,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "opennextjs-cloudflare build",
+    "build": "node scripts/build.cjs",
+    "build:cloudflare": "opennextjs-cloudflare build",
     "build:next": "next build",
     "start": "next start",
     "preview": "opennextjs-cloudflare preview",

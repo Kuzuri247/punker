@@ -28,31 +28,41 @@ function getAllFiles(dir, baseDir) {
 }
 
 const rootDir = process.cwd();
-const otelSrcDir = path.join(rootDir, "node_modules/@opentelemetry/api");
-const standaloneOtelDir = path.join(rootDir, ".next/standalone/node_modules/@opentelemetry/api");
-const nftJsonPath = path.join(rootDir, ".next/server/middleware.js.nft.json");
+const standaloneDir = path.join(rootDir, ".next/standalone");
+const packagesToSync = [
+  "@opentelemetry/api",
+  "pg-cloudflare",
+];
 
-console.log("[patch-middleware-trace] Running middleware trace patch...");
+console.log("[patch-middleware-trace] Running OpenNext trace patch...");
 
-if (fs.existsSync(otelSrcDir) && fs.existsSync(path.join(rootDir, ".next/standalone"))) {
-  console.log("[patch-middleware-trace] Ensuring @opentelemetry/api is present in .next/standalone...");
-  copyDirSync(otelSrcDir, standaloneOtelDir);
+for (const pkg of packagesToSync) {
+  const pkgSrcDir = path.join(rootDir, "node_modules", pkg);
+  const pkgDestDir = path.join(standaloneDir, "node_modules", pkg);
+  if (fs.existsSync(pkgSrcDir) && fs.existsSync(standaloneDir)) {
+    console.log(`[patch-middleware-trace] Ensuring ${pkg} is present in .next/standalone...`);
+    copyDirSync(pkgSrcDir, pkgDestDir);
+  }
 }
 
-if (fs.existsSync(nftJsonPath) && fs.existsSync(otelSrcDir)) {
+const nftJsonPath = path.join(rootDir, ".next/server/middleware.js.nft.json");
+if (fs.existsSync(nftJsonPath)) {
   console.log("[patch-middleware-trace] Updating middleware.js.nft.json...");
   const nftData = JSON.parse(fs.readFileSync(nftJsonPath, "utf8"));
   const filesSet = new Set(nftData.files || []);
-
   const serverDir = path.join(rootDir, ".next/server");
-  const allOtelFiles = getAllFiles(otelSrcDir, serverDir);
-  for (const file of allOtelFiles) {
-    filesSet.add(file);
+
+  for (const pkg of packagesToSync) {
+    const pkgSrcDir = path.join(rootDir, "node_modules", pkg);
+    if (fs.existsSync(pkgSrcDir)) {
+      const allFiles = getAllFiles(pkgSrcDir, serverDir);
+      for (const file of allFiles) {
+        filesSet.add(file);
+      }
+    }
   }
 
   nftData.files = Array.from(filesSet).sort();
   fs.writeFileSync(nftJsonPath, JSON.stringify(nftData, null, 2));
-  console.log(`[patch-middleware-trace] Added @opentelemetry/api files to middleware trace (total entries: ${nftData.files.length}).`);
-} else {
-  console.log("[patch-middleware-trace] middleware.js.nft.json not found or @opentelemetry/api not installed.");
+  console.log(`[patch-middleware-trace] Updated middleware trace (total entries: ${nftData.files.length}).`);
 }
