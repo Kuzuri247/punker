@@ -318,12 +318,12 @@ export function ChatThread({
       <MessageScrollerProvider>
         <MessageScroller className="flex-1">
           <MessageScrollerViewport>
-            <MessageScrollerContent className="mx-auto w-full max-w-3xl px-4 py-8">
+            <MessageScrollerContent className="mx-auto w-full max-w-3xl space-y-6 px-4 py-8 sm:px-6">
               {messages.map((message) => (
                 <MessageScrollerItem key={message.id} messageId={message.id}>
-                  <Message align={message.role === "user" ? "end" : "start"} className="gap-3">
+                  <Message align={message.role === "user" ? "end" : "start"} className="gap-3.5">
                     {message.role === "assistant" && (
-                      <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-sky-400/15 to-indigo-400/15 text-sky-400 self-start mt-0.5">
+                      <div className="flex size-7 shrink-0 items-center justify-center rounded-full border border-border/70 bg-card/80 text-foreground/80 shadow-2xs self-start mt-0.5">
                         <SparklesIcon className="size-3.5" />
                       </div>
                     )}
@@ -335,7 +335,7 @@ export function ChatThread({
                         align={message.role === "user" ? "end" : "start"}
                         className={cn(
                           message.role === "user" &&
-                            "rounded-2xl bg-secondary/80 px-4 py-2 text-[15px] font-normal text-foreground"
+                            "rounded-2xl border border-border/60 bg-secondary/80 px-4 py-2.5 text-[15px] font-normal leading-relaxed text-foreground shadow-2xs"
                         )}
                       >
                         <BubbleContent className="flex flex-col items-start gap-2">
@@ -398,13 +398,13 @@ export function ChatThread({
 
       {/* Subtle Gemini-style generating pulse */}
       {(status === "submitted" || status === "streaming") && (
-        <div className="mx-auto flex w-full max-w-3xl items-center gap-2 px-4 pb-2 text-xs text-muted-foreground">
-          <SparklesIcon className="size-3.5 animate-pulse text-sky-400" />
+        <div className="mx-auto flex w-full max-w-3xl items-center gap-2 px-4 pb-2.5 text-xs text-muted-foreground sm:px-6">
+          <SparklesIcon className="size-3.5 animate-pulse text-foreground/70" />
           <span>Generating…</span>
         </div>
       )}
 
-      <div className="mx-auto flex w-full max-w-3xl shrink-0 flex-col gap-3 px-4 pb-4">
+      <div className="mx-auto flex w-full max-w-3xl shrink-0 flex-col gap-3 px-4 pb-5 sm:px-6">
         {/* Two ways to arrive here, and the balance is checked first because it
             is the one that knows *why*: a turn refused before it started for
             want of credits comes back as an ordinary error, and a Server Action

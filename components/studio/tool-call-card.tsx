@@ -72,25 +72,25 @@ export function ToolCallCard({
 
       {/* Expanded minimal details */}
       {expanded && (
-        <div className="mt-1.5 overflow-hidden rounded-lg border border-border/40 bg-muted/20 p-2.5 text-[12px] text-foreground/90 animate-in fade-in-50">
+        <div className="mt-2 overflow-hidden rounded-xl border border-border/70 bg-card/60 p-3 text-[12px] text-foreground/90 shadow-2xs backdrop-blur-xs animate-in fade-in-50">
           {toolName === "replace_text" && input && (
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               {typeof input.find === "string" && (
-                <div className="rounded bg-destructive/10 p-1.5 text-destructive/90">
-                  <div className="text-[10px] uppercase tracking-wider opacity-60">
+                <div className="rounded-lg border border-destructive/20 bg-destructive/10 p-2 text-destructive">
+                  <div className="text-[10px] font-medium uppercase tracking-wider opacity-70 mb-1">
                     - find
                   </div>
-                  <pre className="max-h-28 overflow-x-auto whitespace-pre-wrap">
+                  <pre className="max-h-28 overflow-x-auto font-mono text-[11px] whitespace-pre-wrap">
                     {input.find}
                   </pre>
                 </div>
               )}
               {typeof input.replace === "string" && (
-                <div className="rounded bg-emerald-500/10 p-1.5 text-emerald-400">
-                  <div className="text-[10px] uppercase tracking-wider opacity-60">
+                <div className="rounded-lg border border-border/70 bg-muted/40 p-2 text-foreground">
+                  <div className="text-[10px] font-medium uppercase tracking-wider opacity-70 mb-1">
                     + replace
                   </div>
-                  <pre className="max-h-28 overflow-x-auto whitespace-pre-wrap">
+                  <pre className="max-h-28 overflow-x-auto font-mono text-[11px] whitespace-pre-wrap">
                     {input.replace || "(removed)"}
                   </pre>
                 </div>
@@ -99,12 +99,12 @@ export function ToolCallCard({
           )}
 
           {toolName === "write_file" && input && typeof input.content === "string" && (
-            <div className="space-y-1">
-              <div className="flex justify-between text-[10px] text-muted-foreground">
+            <div className="space-y-1.5">
+              <div className="flex justify-between text-[11px] text-muted-foreground font-mono">
                 <span>{targetPath}</span>
                 <span>{input.content.split("\n").length} lines</span>
               </div>
-              <pre className="max-h-36 overflow-x-auto whitespace-pre-wrap rounded bg-background/50 p-2">
+              <pre className="max-h-36 overflow-x-auto whitespace-pre-wrap rounded-lg border border-border/60 bg-muted/30 p-2.5 font-mono text-[11px] leading-relaxed">
                 {input.content.slice(0, 1000) +
                   (input.content.length > 1000 ? "\n... [truncated]" : "")}
               </pre>
@@ -112,7 +112,7 @@ export function ToolCallCard({
           )}
 
           {toolName === "qa_inspect" && (
-            <div className="text-[11px] text-muted-foreground">
+            <div className="rounded-lg border border-border/60 bg-muted/20 p-2 text-xs text-muted-foreground">
               QA Audit passed: index.html structure, scripts, and canvas verified.
             </div>
           )}

@@ -256,10 +256,10 @@ function MinimalistCanvasLoader({
   status: "loading" | "building"
 }) {
   return (
-    <div className="relative flex h-full w-full flex-col items-center justify-center overflow-hidden bg-secondary/15 p-6 select-none">
+    <div className="relative flex h-full w-full flex-col items-center justify-center overflow-hidden bg-muted/20 p-6 select-none">
       {/* Subtle perspective grid lines */}
       <div
-        className="pointer-events-none absolute inset-0 opacity-[0.035] dark:opacity-[0.06]"
+        className="pointer-events-none absolute inset-0 opacity-[0.04] dark:opacity-[0.07]"
         style={{
           backgroundImage: `
             linear-gradient(to right, currentColor 1px, transparent 1px),
@@ -271,13 +271,13 @@ function MinimalistCanvasLoader({
         }}
       />
 
-      {/* Ambient soft glow */}
-      <div className="pointer-events-none absolute size-72 rounded-full bg-gradient-to-tr from-sky-400/10 via-indigo-400/10 to-transparent blur-3xl" />
+      {/* Ambient soft neutral glow */}
+      <div className="pointer-events-none absolute size-72 rounded-full bg-foreground/[0.025] blur-3xl" />
 
       {/* Central minimal loader */}
-      <div className="relative z-10 flex flex-col items-center gap-3 text-center animate-in fade-in duration-300">
-        <div className="relative flex size-10 items-center justify-center rounded-2xl border border-border/50 bg-secondary/40 shadow-xs">
-          <Sparkles className="size-4 text-sky-400 animate-pulse" />
+      <div className="relative z-10 flex flex-col items-center gap-3.5 text-center animate-in fade-in duration-300">
+        <div className="relative flex size-10 items-center justify-center rounded-xl border border-border/80 bg-card/90 shadow-2xs">
+          <Sparkles className="size-4 text-foreground/80 animate-pulse" />
         </div>
 
         <div className="flex flex-col items-center gap-1">
@@ -286,7 +286,7 @@ function MinimalistCanvasLoader({
               ? "Building 3D Scene"
               : "Connecting Live Preview"}
           </span>
-          <span className="text-[12px] text-muted-foreground max-w-[260px] leading-relaxed">
+          <span className="text-[12px] text-muted-foreground max-w-[280px] leading-relaxed">
             {status === "building"
               ? "Punker Studio is preparing assets, camera, and game loop…"
               : "Loading sandbox environment…"}

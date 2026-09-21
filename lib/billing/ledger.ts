@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm"
+import { and, eq, sql } from "drizzle-orm"
 
 // Imported straight from `./client` rather than `@/lib/db`, and taking an
 // explicit `orgId` rather than reading Clerk's: `chargeStep` runs inside the
@@ -71,12 +71,20 @@ export async function chargeStep({
   orgId,
   responseId,
   amount,
+  bypassDeduction = false,
 }: {
   orgId: string
   responseId: string
   amount: bigint
   agentRole?: string
+  bypassDeduction?: boolean
 }): Promise<void> {
+  // In safe testing mode or when deduction bypass is enabled, skip deducting
+  // credits so that testing doesn't deplete developer or organization balance.
+  if (bypassDeduction || process.env.SAFE_TESTING_MODE === "true") {
+    return
+  }
+
   // A step that cost nothing — no usage reported, or a turn stopped before the
   // model ran — is not a row worth writing.
   if (amount <= 0n) {
@@ -91,6 +99,44 @@ export async function chargeStep({
       amount: -amount,
     })
     .onConflictDoNothing()
+}
+
+/**
+ * Grants test credits to an organization without charging any real payment.
+ * Used by safe testing endpoints and developers during local development.
+ */
+export async function grantTestCredits(
+  orgId: string,
+  amountInDollars = 50
+): Promise<bigint> {
+  const amount = BigInt(Math.max(1, Math.round(amountInDollars))) * DOLLAR
+
+  await db
+    .insert(creditLedger)
+    .values({
+      orgId,
+      entryKey: `test:grant:${Date.now()}:${crypto.randomUUID().slice(0, 8)}`,
+      amount,
+    })
+    .onConflictDoNothing()
+
+  return getCreditBalance(orgId)
+}
+
+/**
+ * Clears recorded step debits for an organization to restore full testing capacity.
+ */
+export async function resetTestSpend(orgId: string): Promise<bigint> {
+  await db
+    .delete(creditLedger)
+    .where(
+      and(
+        eq(creditLedger.orgId, orgId),
+        sql`${creditLedger.amount} < 0`
+      )
+    )
+
+  return getCreditBalance(orgId)
 }
 
 /**

@@ -25,7 +25,7 @@ export function StudioStatus({
   return (
     <div
       className={cn(
-        "mx-auto flex w-full max-w-3xl items-center justify-between gap-3 rounded-xl border border-primary/30 bg-card/90 px-4 py-2.5 text-xs text-foreground shadow-lg backdrop-blur-md transition-all animate-in fade-in-50 slide-in-from-bottom-2",
+        "mx-auto flex w-full max-w-3xl items-center justify-between gap-3 rounded-xl border border-border/80 bg-card/95 px-4 py-2.5 text-xs text-foreground shadow-sm backdrop-blur-md transition-all animate-in fade-in-50 slide-in-from-bottom-2",
         className
       )}
     >

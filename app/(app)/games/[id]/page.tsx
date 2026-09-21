@@ -29,9 +29,6 @@ export default async function GamePage({
 
   return (
     <div className="relative flex h-svh flex-col">
-      <div className="fixed top-3 right-3 z-30">
-        <GameMenu gameId={game.id} title={game.title} />
-      </div>
       <GameChat
         gameId={game.id}
         // What the thread opens with. It goes stale as the turn spends, which is

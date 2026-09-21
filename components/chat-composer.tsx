@@ -62,7 +62,7 @@ export function ChatComposer({
 
   return (
     <form onSubmit={handleSubmit} className="w-full">
-      <InputGroup className="rounded-2xl border-border/60 bg-secondary/35 p-1.5 shadow-xs transition-all focus-within:border-sky-500/40 focus-within:ring-1 focus-within:ring-sky-500/20">
+      <InputGroup className="rounded-2xl border border-border/70 bg-card/75 p-2 shadow-xs backdrop-blur-sm transition-all focus-within:border-foreground/30 focus-within:ring-2 focus-within:ring-foreground/10 hover:border-border">
         <InputGroupTextarea
           name="prompt"
           value={value}
@@ -71,9 +71,9 @@ export function ChatComposer({
           disabled={disabled}
           placeholder={placeholder}
           rows={1}
-          className="field-sizing-content max-h-48 min-h-11 px-3 pt-2 text-[15px] placeholder:text-muted-foreground/60"
+          className="field-sizing-content max-h-48 min-h-12 px-3.5 pt-2.5 text-[15px] leading-relaxed placeholder:text-muted-foreground/60"
         />
-        <InputGroupAddon align="block-end" className="px-1.5 pt-1">
+        <InputGroupAddon align="block-end" className="gap-2 px-2 pb-1 pt-1.5">
           <ModelPicker modelId={modelId} onModelChange={onModelChange} />
           {/* Base UI buttons default to `type="button"`, so only send opts in. */}
           {canStop ? (
@@ -81,7 +81,7 @@ export function ChatComposer({
               size="icon"
               onClick={onStop}
               aria-label="Stop generating"
-              className="ml-auto size-8 rounded-full bg-foreground text-background hover:bg-foreground/90 transition-transform active:scale-95"
+              className="ml-auto size-8 rounded-full bg-foreground text-background shadow-xs hover:bg-foreground/90 transition-all active:scale-95"
             >
               <SquareIcon className="size-3.5 fill-current" />
             </Button>
@@ -91,7 +91,7 @@ export function ChatComposer({
               size="icon"
               disabled={!canSubmit}
               aria-label="Send message"
-              className="ml-auto size-8 rounded-full bg-foreground text-background hover:bg-foreground/90 disabled:opacity-30 transition-transform active:scale-95"
+              className="ml-auto size-8 rounded-full bg-foreground text-background shadow-xs hover:bg-foreground/90 disabled:opacity-25 transition-all active:scale-95"
             >
               <ArrowUpIcon className="size-4" />
             </Button>

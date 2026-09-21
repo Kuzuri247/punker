@@ -25,12 +25,12 @@ export function StepsDropdown({
   const activeStep = steps.find((s) => s.isLoading)
 
   return (
-    <div className={cn("my-1.5 flex flex-col items-start gap-1 text-[13px]", className)}>
+    <div className={cn("my-2 flex flex-col items-start gap-1.5 text-[13px]", className)}>
       {/* Active step running in real-time */}
       {activeStep && (
-        <div className="flex items-center gap-2 rounded-full border border-sky-400/20 bg-sky-400/10 px-3 py-1 text-sky-400 animate-in fade-in duration-200">
-          <span className="size-1.5 rounded-full bg-sky-400 animate-pulse" />
-          <span className="font-normal">{activeStep.activeLabel}…</span>
+        <div className="flex items-center gap-2 rounded-full border border-border/80 bg-secondary/90 px-3 py-1 text-xs font-medium text-foreground shadow-2xs animate-in fade-in duration-200">
+          <span className="size-1.5 rounded-full bg-foreground animate-pulse" />
+          <span>{activeStep.activeLabel}…</span>
         </div>
       )}
 
@@ -40,10 +40,10 @@ export function StepsDropdown({
           <button
             type="button"
             onClick={() => setIsOpen((prev) => !prev)}
-            className="group flex items-center gap-1.5 rounded-full border border-border/40 bg-secondary/30 px-3 py-1 text-muted-foreground hover:bg-secondary/60 hover:text-foreground transition-all"
+            className="group flex items-center gap-1.5 rounded-full border border-border/70 bg-card/60 px-3 py-1 text-xs text-muted-foreground shadow-2xs hover:border-foreground/30 hover:bg-card hover:text-foreground transition-all"
             aria-expanded={isOpen}
           >
-            <Check className="size-3 text-sky-400" />
+            <Check className="size-3 text-foreground/80" />
             <span>
               {completedSteps.length === 1
                 ? "1 step completed"
@@ -58,7 +58,7 @@ export function StepsDropdown({
 
           {/* Expanded dropdown list */}
           {isOpen && (
-            <div className="mt-2 flex flex-col gap-1.5 pl-2 animate-in fade-in-50 slide-in-from-top-1 duration-150">
+            <div className="mt-2 flex flex-col gap-1.5 border-l border-border/60 pl-3 ml-2.5 animate-in fade-in-50 slide-in-from-top-1 duration-150">
               {completedSteps.map((step) => (
                 <div
                   key={step.id}
@@ -67,7 +67,7 @@ export function StepsDropdown({
                   {step.hasError ? (
                     <AlertCircle className="size-3 text-destructive shrink-0" />
                   ) : (
-                    <Check className="size-3 text-sky-400 shrink-0" />
+                    <Check className="size-3 text-foreground/70 shrink-0" />
                   )}
                   <span>{step.label}</span>
                 </div>

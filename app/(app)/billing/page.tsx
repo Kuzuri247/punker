@@ -37,7 +37,7 @@ export default async function BillingPage() {
       <div className="mx-auto w-full max-w-4xl px-6 py-10">
         <div className="flex flex-col gap-10">
           {/* Credit balance display */}
-          <section className="rounded-2xl border border-border/50 bg-secondary/20 p-6">
+          <section className="rounded-2xl border border-border/70 bg-card/75 p-6 shadow-xs">
             <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
               Available Studio Credits
             </span>
@@ -62,7 +62,7 @@ export default async function BillingPage() {
             </div>
 
             <div className="grid gap-4 sm:grid-cols-3">
-              <div className="rounded-2xl border border-border/60 bg-card/40 p-5">
+              <div className="rounded-2xl border border-border/70 bg-card/50 p-5 shadow-2xs">
                 <div className="text-sm font-semibold text-foreground">Free Explorer</div>
                 <div className="mt-1 text-2xl font-bold tracking-tight">$0<span className="text-xs font-normal text-muted-foreground"> /mo</span></div>
                 <p className="mt-2 text-xs text-muted-foreground">
@@ -70,10 +70,10 @@ export default async function BillingPage() {
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-sky-500/30 bg-sky-500/5 p-5">
+              <div className="rounded-2xl border-2 border-foreground/80 bg-card p-5 shadow-sm">
                 <div className="flex items-center justify-between">
                   <div className="text-sm font-semibold text-foreground">Creator</div>
-                  <span className="rounded-full bg-sky-500/20 px-2 py-0.5 text-[10px] font-medium text-sky-400">
+                  <span className="rounded-full bg-foreground text-background px-2.5 py-0.5 text-[10px] font-medium">
                     Popular
                   </span>
                 </div>
@@ -83,7 +83,7 @@ export default async function BillingPage() {
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-border/60 bg-card/40 p-5">
+              <div className="rounded-2xl border border-border/70 bg-card/50 p-5 shadow-2xs">
                 <div className="text-sm font-semibold text-foreground">Studio Pro</div>
                 <div className="mt-1 text-2xl font-bold tracking-tight">$49<span className="text-xs font-normal text-muted-foreground"> /mo</span></div>
                 <p className="mt-2 text-xs text-muted-foreground">

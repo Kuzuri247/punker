@@ -1,5 +1,4 @@
 import { auth } from "@clerk/nextjs/server"
-import { SparklesIcon } from "lucide-react"
 
 import { NewGameComposer } from "@/components/new-game-composer"
 

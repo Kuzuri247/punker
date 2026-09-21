@@ -81,8 +81,8 @@ export function AppSidebar({
           <SidebarGroupLabel>Recents</SidebarGroupLabel>
           <SidebarGroupContent>
             {games.length === 0 ? (
-              <Empty className="border p-2 group-data-[collapsible=icon]:hidden">
-                <EmptyDescription className="text-xs">
+              <Empty className="rounded-xl border border-border/60 bg-muted/20 p-3 group-data-[collapsible=icon]:hidden">
+                <EmptyDescription className="text-xs text-muted-foreground">
                   Your games will live here.
                 </EmptyDescription>
               </Empty>
@@ -134,8 +134,8 @@ export function AppSidebar({
                       </PopoverTitle>
                     </PopoverHeader>
                     {games.length === 0 ? (
-                      <Empty className="border p-2">
-                        <EmptyDescription className="text-xs">
+                      <Empty className="rounded-xl border border-border/60 bg-muted/20 p-3">
+                        <EmptyDescription className="text-xs text-muted-foreground">
                           Your games will live here.
                         </EmptyDescription>
                       </Empty>
@@ -175,7 +175,9 @@ export function AppSidebar({
               <CoinsIcon />
               <span>Credits</span>
             </SidebarMenuButton>
-            <SidebarMenuBadge>{formatCredits(credits)}</SidebarMenuBadge>
+            <SidebarMenuBadge className="rounded-md border border-border/60 bg-secondary/80 px-2 py-0.5 text-[11px] font-medium text-foreground/80">
+              {formatCredits(credits)}
+            </SidebarMenuBadge>
           </SidebarMenuItem>
         </SidebarMenu>
         <div className="flex items-center justify-between gap-2 px-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">

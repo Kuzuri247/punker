@@ -56,17 +56,17 @@ export function NewGameComposer() {
         onModelChange={setModelId}
         disabled={isPending}
       />
-      <div className="flex flex-wrap justify-center gap-2 pt-1">
+      <div className="flex flex-wrap justify-center gap-2 pt-2.5">
         {suggestions.map((suggestion) => (
           <Button
             key={suggestion.label}
             variant="outline"
             size="sm"
-            className="rounded-full border-border/50 bg-secondary/20 px-3.5 py-1.5 text-xs font-normal text-muted-foreground hover:border-border/80 hover:bg-secondary/50 hover:text-foreground transition-all"
+            className="group rounded-full border border-border/70 bg-card/60 px-3.5 py-1.5 text-xs font-normal text-muted-foreground shadow-2xs backdrop-blur-xs hover:border-foreground/30 hover:bg-card hover:text-foreground active:scale-98 transition-all"
             disabled={isPending}
             onClick={() => handleSuggestion(suggestion.prompt)}
           >
-            <suggestion.icon className="size-3 text-sky-400/80" />
+            <suggestion.icon className="size-3.5 text-muted-foreground/80 transition-colors group-hover:text-foreground" />
             {suggestion.label}
           </Button>
         ))}
