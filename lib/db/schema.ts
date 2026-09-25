@@ -3,6 +3,7 @@ import { sql } from "drizzle-orm"
 import {
   bigint,
   index,
+  integer,
   jsonb,
   pgTable,
   text,
@@ -79,3 +80,38 @@ export const creditLedger = pgTable(
 
 export type CreditLedgerEntry = typeof creditLedger.$inferSelect
 export type NewCreditLedgerEntry = typeof creditLedger.$inferInsert
+
+export const subscriptions = pgTable("subscriptions", {
+  id: text("id").primaryKey(), // sub_xxx from Dodo
+  userId: text("user_id").notNull().unique(), // Clerk user ID or org ID
+  customerId: text("customer_id").notNull(),
+  tier: text("tier").notNull().default("free"), // free | pro | studio
+  status: text("status").notNull(), // active, on_hold, cancelled
+  currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
+  sandboxMemoryMb: integer("sandbox_memory_mb").notNull().default(1024),
+  sandboxVcpu: integer("sandbox_vcpu").notNull().default(1),
+  maxConcurrentSandboxes: integer("max_concurrent_sandboxes").notNull().default(1),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .default(sql`now()`),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .default(sql`now()`)
+    .$onUpdate(() => new Date()),
+})
+
+export type Subscription = typeof subscriptions.$inferSelect
+export type NewSubscription = typeof subscriptions.$inferInsert
+
+export const creditWallets = pgTable("credit_wallets", {
+  userId: text("user_id").primaryKey(), // Clerk user ID or org ID
+  balance: integer("balance").notNull().default(50),
+  lifetimePurchased: integer("lifetime_purchased").notNull().default(0),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .default(sql`now()`)
+    .$onUpdate(() => new Date()),
+})
+
+export type CreditWallet = typeof creditWallets.$inferSelect
+export type NewCreditWallet = typeof creditWallets.$inferInsert

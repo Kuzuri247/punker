@@ -1,6 +1,6 @@
 "use client"
 
-import { EllipsisIcon, PencilLineIcon, Trash2Icon } from "lucide-react"
+import { DownloadIcon, EllipsisIcon, PencilLineIcon, Trash2Icon } from "lucide-react"
 import { usePathname } from "next/navigation"
 import { useState, useTransition } from "react"
 
@@ -121,6 +121,43 @@ export function GameMenu({
     })
   }
 
+  const [isExporting, setIsExporting] = useState(false)
+
+  async function handleExport() {
+    setIsExporting(true)
+    setError(null)
+
+    try {
+      const response = await fetch(`/api/games/${gameId}/download`)
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null)
+        throw new Error(
+          errorData?.error || `Export failed: HTTP ${response.status}`
+        )
+      }
+
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const filename = `${title.replace(/[^a-zA-Z0-9_-]/g, "_").toLowerCase()}-build.zip`
+
+      const anchor = document.createElement("a")
+      anchor.style.display = "none"
+      anchor.href = url
+      anchor.download = filename
+      document.body.appendChild(anchor)
+      anchor.click()
+
+      setTimeout(() => {
+        document.body.removeChild(anchor)
+        window.URL.revokeObjectURL(url)
+      }, 1000)
+    } catch (err: any) {
+      alert(err?.message || "Failed to download game export.")
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
   const trimmed = name.trim()
 
   return (
@@ -137,7 +174,14 @@ export function GameMenu({
         </DropdownMenuTrigger>
         {/* Anchored to the trigger's right edge, which is the window's — a menu
             aligned the other way would hang off the screen. */}
-        <DropdownMenuContent align="end" className="w-40">
+        <DropdownMenuContent align="end" className="w-52">
+          <DropdownMenuItem
+            onClick={handleExport}
+            disabled={isExporting}
+          >
+            {isExporting ? <Spinner className="size-4" /> : <DownloadIcon />}
+            {isExporting ? "Exporting game..." : "Export Native (.zip / .exe)"}
+          </DropdownMenuItem>
           <DropdownMenuItem onClick={() => openDialog("rename")}>
             <PencilLineIcon />
             Rename

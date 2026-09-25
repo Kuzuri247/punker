@@ -1,6 +1,7 @@
 import type { Sandbox } from "@daytona/sdk"
 import { eq } from "drizzle-orm"
 
+import { getEntitlements } from "@/lib/billing/entitlements"
 import { daytona } from "@/lib/daytona/client"
 // Imported straight from `./client` rather than `@/lib/db`, like the chat
 // store: this module runs inside the Trigger.dev worker, where the
@@ -32,11 +33,33 @@ export async function createGameSandbox(
   const startedAt = performance.now()
   const { folders, files } = await readRuntimeFiles(GAME_DIR)
 
-  const sandbox = await daytona.create({
-    labels: { gameId },
-    autoStopInterval: 15,
-    autoArchiveInterval: 2880,
-  })
+  // Resolve organization and entitlements to size the Daytona workspace
+  const [gameRow] = await db
+    .select({ orgId: games.orgId })
+    .from(games)
+    .where(eq(games.id, gameId))
+    .limit(1)
+
+  const entitlements = await getEntitlements(gameRow?.orgId)
+  const memoryGb = Math.max(1, Math.round(entitlements.sandboxMemoryMb / 1024))
+  const cpu = Math.max(1, entitlements.sandboxVcpu)
+
+  const sandbox = process.env.DAYTONA_SANDBOX_IMAGE
+    ? await daytona.create({
+        image: process.env.DAYTONA_SANDBOX_IMAGE,
+        labels: { gameId, tier: entitlements.tier },
+        autoStopInterval: entitlements.autoStopMinutes,
+        autoArchiveInterval: 2880,
+        resources: {
+          cpu,
+          memory: memoryGb,
+        },
+      })
+    : await daytona.create({
+        labels: { gameId, tier: entitlements.tier },
+        autoStopInterval: entitlements.autoStopMinutes,
+        autoArchiveInterval: 2880,
+      })
 
   await sandbox.fs.createFolder(GAME_DIR, "755")
 

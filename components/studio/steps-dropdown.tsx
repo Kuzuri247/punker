@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Check, ChevronDown, ChevronRight, AlertCircle } from "lucide-react"
+import { Check, ChevronDown, ChevronRight, AlertCircle, FileCode } from "lucide-react"
 import type { DynamicToolUIPart, ToolUIPart } from "ai"
 
 import { getFriendlyStepInfo } from "./friendly-step"
@@ -31,6 +31,11 @@ export function StepsDropdown({
         <div className="flex items-center gap-2 rounded-full border border-border/80 bg-secondary/90 px-3 py-1 text-xs font-medium text-foreground shadow-2xs animate-in fade-in duration-200">
           <span className="size-1.5 rounded-full bg-foreground animate-pulse" />
           <span>{activeStep.activeLabel}…</span>
+          {activeStep.targetFile && (
+            <span className="rounded bg-background/60 px-1.5 py-0.2 font-mono text-[10px] text-muted-foreground">
+              {activeStep.targetFile}
+            </span>
+          )}
         </div>
       )}
 
@@ -70,6 +75,12 @@ export function StepsDropdown({
                     <Check className="size-3 text-foreground/70 shrink-0" />
                   )}
                   <span>{step.label}</span>
+                  {step.targetFile && (
+                    <span className="flex items-center gap-1 rounded bg-muted/60 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground/80">
+                      <FileCode className="size-2.5 opacity-60" />
+                      {step.targetFile}
+                    </span>
+                  )}
                 </div>
               ))}
             </div>

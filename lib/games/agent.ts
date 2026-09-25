@@ -1,17 +1,14 @@
 import type { GameModelId } from "./model-catalog"
-import { gameModels } from "./models"
+import { resolveModel } from "./models"
 
 /**
  * The per-model half of a turn's `streamText` call.
- *
- * Spread into `streamText` alongside the options that don't vary with the
- * model — the instructions, the tools, the step limit. Today it resolves to
- * the provider instance and nothing more, and it is a function rather than a
- * bare lookup because the three models are not one generation: the first
- * setting that has to differ between them — thinking, effort, an output cap —
- * belongs here, next to the model it applies to, rather than as a branch in
- * the middle of the run function.
+ * Spread into `streamText` alongside instructions and tools.
+ * Resolves the appropriate model instance (supporting BYOK when provided).
  */
-export function gameModelSettings(modelId: GameModelId) {
-  return { model: gameModels[modelId] }
+export function gameModelSettings(
+  modelId: GameModelId,
+  options?: { customApiKey?: string }
+) {
+  return { model: resolveModel(modelId, options) }
 }

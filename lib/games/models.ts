@@ -1,18 +1,12 @@
+import { createAnthropic } from "@ai-sdk/anthropic"
 import { createGoogle } from "@ai-sdk/google"
+import { createOpenAI } from "@ai-sdk/openai"
 import type { LanguageModel } from "ai"
 
-import type { GameModelId } from "./model-catalog"
+import { getModelConfig, type GameModelId } from "./model-catalog"
 
 /**
  * Intercepts Gemini API calls to gracefully handle Google Free-Tier 429 rate limits.
- *
- * The Gemini Free Tier has a strict 20 RPM (requests per minute) limit.
- * During multi-step agent builds (up to 48 steps), 20 steps can execute in ~20 seconds,
- * triggering a temporary RESOURCE_EXHAUSTED quota error.
- *
- * Instead of crashing the turn with AI_RetryError, this wrapper parses Google's exact
- * cooldown instruction (e.g. "Please retry in 25.9s"), sleeps for that duration,
- * and automatically retries the call.
  */
 async function rateLimitedFetch(
   input: RequestInfo | URL,
@@ -56,8 +50,7 @@ async function rateLimitedFetch(
 }
 
 /**
- * The configured Google Generative AI provider.
- * Supports both `GEMINI_API_KEY` and standard `GOOGLE_GENERATIVE_AI_API_KEY`.
+ * Google Generative AI provider instance.
  */
 export const google = createGoogle({
   apiKey: process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY,
@@ -65,22 +58,53 @@ export const google = createGoogle({
 })
 
 /**
- * The provider instance behind each catalog entry.
- *
- * Server-side only — constructing these reaches for `GEMINI_API_KEY` or
- * `GOOGLE_GENERATIVE_AI_API_KEY`, and the provider SDK has no business in a
- * browser bundle. There is no `server-only` marker enforcing that, though, for
- * the same reason `@/lib/db` keeps its marker in a separate entry: the chat
- * agent imports this module and runs in the Trigger.dev worker, where that
- * marker throws. Reach for the catalog instead of this file from anything a
- * client component can touch.
- *
- * `satisfies` rather than an annotation, so the record has to cover every
- * `GameModelId` — a model added to the catalog and forgotten here is a type
- * error, not an undefined model discovered at the top of someone's turn.
+ * Anthropic provider instance.
+ */
+export const anthropic = createAnthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+})
+
+/**
+ * OpenAI provider instance.
+ */
+export const openai = createOpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+})
+
+/**
+ * The baseline model instances for each catalog ID using platform API keys.
  */
 export const gameModels = {
   "gemini-3.8-flash": google("gemini-3.8-flash"),
   "gemini-3.6-flash": google("gemini-3.6-flash"),
   "gemini-3.5-flash-lite": google("gemini-3.5-flash-lite"),
+  "claude-3-7-sonnet": anthropic("claude-3-7-sonnet-20250219"),
+  "claude-3-5-haiku": anthropic("claude-3-5-haiku-20241022"),
+  "gpt-4o": openai("gpt-4o"),
+  "gpt-4o-mini": openai("gpt-4o-mini"),
 } satisfies Record<GameModelId, LanguageModel>
+
+/**
+ * Dynamically resolves an LLM provider and model instance.
+ * Supports Bring-Your-Own-Key (BYOK) when a custom API key is passed.
+ */
+export function resolveModel(
+  modelId: GameModelId,
+  options?: { customApiKey?: string }
+): LanguageModel {
+  const config = getModelConfig(modelId)
+
+  if (options?.customApiKey) {
+    if (config.provider === "anthropic") {
+      return createAnthropic({ apiKey: options.customApiKey })(config.modelSlug)
+    }
+    if (config.provider === "openai") {
+      return createOpenAI({ apiKey: options.customApiKey })(config.modelSlug)
+    }
+    if (config.provider === "google") {
+      return createGoogle({ apiKey: options.customApiKey })(config.modelSlug)
+    }
+  }
+
+  return gameModels[modelId]
+}

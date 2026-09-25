@@ -3,9 +3,9 @@
 import type { ChatSessionPersistedState } from "@trigger.dev/sdk/chat"
 import type { UIMessage } from "ai"
 import { useRouter } from "next/navigation"
-import { useCallback, useState } from "react"
+import { useCallback, useRef, useState } from "react"
 
-import { ChatPreview } from "@/components/chat-preview"
+import { ChatPreview, type GameError } from "@/components/chat-preview"
 import { ChatThread } from "@/components/chat-thread"
 import {
   ResizableHandle,
@@ -36,6 +36,7 @@ export function GameChat({
   // player — see `ChatPreview` for why a reload needs a new number rather than
   // just a new fetch.
   const [previewRevision, setPreviewRevision] = useState(0)
+  const sendPromptRef = useRef<((text: string) => void) | null>(null)
 
   const router = useRouter()
 
@@ -50,6 +51,17 @@ export function GameChat({
     router.refresh()
   }, [router])
 
+  const handleSelfHeal = useCallback((error: GameError) => {
+    if (!sendPromptRef.current) return
+    const fileLoc = error.source
+      ? `\nTarget file: ${error.source.split("/").pop() || error.source}${error.line ? `:${error.line}` : ""}`
+      : ""
+    const stackPart = error.stack ? `\nStack trace:\n\`\`\`\n${error.stack}\n\`\`\`` : ""
+    sendPromptRef.current(
+      `Autonomous Self-Healing: The game encountered a runtime crash during preview:\n"${error.message}"${fileLoc}${stackPart}\nPlease inspect the code and fix this error immediately.`
+    )
+  }, [])
+
   const thread = (
     <ChatThread
       gameId={gameId}
@@ -58,6 +70,7 @@ export function GameChat({
       initialModelId={initialModelId}
       initialSession={initialSession}
       onTurnComplete={handleTurnComplete}
+      sendPromptRef={sendPromptRef}
     />
   )
 
@@ -99,6 +112,7 @@ export function GameChat({
             key={gameId}
             gameId={gameId}
             revision={previewRevision}
+            onSelfHeal={handleSelfHeal}
           />
         </ResizablePanel>
       </ResizablePanelGroup>

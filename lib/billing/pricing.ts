@@ -53,6 +53,30 @@ export const MODEL_RATES = {
     cacheWrite: perMillionTokens(0.075),
     output: perMillionTokens(0.3),
   },
+  "claude-3-7-sonnet": {
+    input: perMillionTokens(3.0),
+    cacheRead: perMillionTokens(0.3),
+    cacheWrite: perMillionTokens(3.75),
+    output: perMillionTokens(15.0),
+  },
+  "claude-3-5-haiku": {
+    input: perMillionTokens(0.8),
+    cacheRead: perMillionTokens(0.08),
+    cacheWrite: perMillionTokens(1.0),
+    output: perMillionTokens(4.0),
+  },
+  "gpt-4o": {
+    input: perMillionTokens(2.5),
+    cacheRead: perMillionTokens(1.25),
+    cacheWrite: perMillionTokens(2.5),
+    output: perMillionTokens(10.0),
+  },
+  "gpt-4o-mini": {
+    input: perMillionTokens(0.15),
+    cacheRead: perMillionTokens(0.075),
+    cacheWrite: perMillionTokens(0.15),
+    output: perMillionTokens(0.6),
+  },
 } satisfies Record<GameModelId, ModelRates>
 
 function costOf(tokens: number | undefined, rate: bigint): bigint {

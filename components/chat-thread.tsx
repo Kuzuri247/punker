@@ -25,7 +25,9 @@ import Link from "next/link"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 import { ChatComposer } from "@/components/chat-composer"
+import { MarkdownMessage } from "@/components/markdown-message"
 import { StepsDropdown } from "@/components/studio/steps-dropdown"
+import { ThoughtAccordion } from "@/components/studio/thought-accordion"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Bubble, BubbleContent } from "@/components/ui/bubble"
 import { Marker, MarkerContent, MarkerIcon } from "@/components/ui/marker"
@@ -54,7 +56,12 @@ import {
   mintGameChatAccessToken,
   startGameChatSession,
 } from "@/lib/games/chat-actions"
-import type { GameModelId } from "@/lib/games/model-catalog"
+import {
+  DEFAULT_GAME_MODEL_ID,
+  getModelConfig,
+  type GameModelId,
+} from "@/lib/games/model-catalog"
+import { getStoredApiKey, onByokChange } from "@/lib/games/byok-store"
 import { describeError } from "@/lib/observability"
 import { cn } from "@/lib/utils"
 // Type-only: the agent module reaches the server bundle, never the browser.
@@ -65,6 +72,7 @@ const ASK_PLAYER = "ask_player"
 
 type PartGroup =
   | { type: "text"; text: string; key: string | number }
+  | { type: "reasoning"; text: string; key: string | number }
   | { type: "ask_player"; part: ToolUIPart | DynamicToolUIPart }
   | { type: "tools"; parts: Array<ToolUIPart | DynamicToolUIPart>; key: string }
 
@@ -75,7 +83,7 @@ function groupMessageParts(parts: UIMessage["parts"]): PartGroup[] {
   for (let i = 0; i < parts.length; i++) {
     const part = parts[i]
 
-    if (part.type === "text") {
+    if ((part as any).type === "reasoning") {
       if (currentTools.length > 0) {
         groups.push({
           type: "tools",
@@ -84,7 +92,30 @@ function groupMessageParts(parts: UIMessage["parts"]): PartGroup[] {
         })
         currentTools = []
       }
-      groups.push({ type: "text", text: part.text, key: `text-${i}` })
+      const rText = (part as any).text || (part as any).reasoning || ""
+      if (rText) {
+        const lastGroup = groups[groups.length - 1]
+        if (lastGroup && lastGroup.type === "reasoning") {
+          lastGroup.text += rText
+        } else {
+          groups.push({ type: "reasoning", text: rText, key: `reasoning-${i}` })
+        }
+      }
+    } else if (part.type === "text") {
+      if (currentTools.length > 0) {
+        groups.push({
+          type: "tools",
+          parts: currentTools,
+          key: `tools-${currentTools[0].toolCallId}`,
+        })
+        currentTools = []
+      }
+      const lastGroup = groups[groups.length - 1]
+      if (lastGroup && lastGroup.type === "text") {
+        lastGroup.text += part.text
+      } else {
+        groups.push({ type: "text", text: part.text, key: `text-${i}` })
+      }
     } else if (isToolUIPart(part)) {
       if (getToolName(part) === ASK_PLAYER) {
         if (currentTools.length > 0) {
@@ -120,6 +151,7 @@ export function ChatThread({
   initialModelId,
   initialSession,
   onTurnComplete,
+  sendPromptRef,
 }: {
   gameId: string
   credits: bigint
@@ -127,6 +159,7 @@ export function ChatThread({
   initialModelId: GameModelId
   initialSession?: ChatSessionPersistedState
   onTurnComplete: () => void
+  sendPromptRef?: React.MutableRefObject<((text: string) => void) | null>
 }) {
   const [prompt, setPrompt] = useState("")
   // The thread owns the choice from here on, because the thread is what sends
@@ -135,9 +168,24 @@ export function ChatThread({
   // built with, so a reload starts over from the URL.
   const [modelId, setModelId] = useState<GameModelId>(initialModelId)
 
+  const selectedModel = useMemo(() => getModelConfig(modelId), [modelId])
+  const [byokKey, setByokKey] = useState<string | undefined>(() =>
+    getStoredApiKey(selectedModel.provider)
+  )
+
+  useEffect(() => {
+    setByokKey(getStoredApiKey(selectedModel.provider))
+    return onByokChange(() => {
+      setByokKey(getStoredApiKey(selectedModel.provider))
+    })
+  }, [selectedModel.provider])
+
   // Memoized because the transport re-reads this whenever its identity changes,
   // and a fresh object literal every render would be a change every render.
-  const clientData = useMemo(() => ({ modelId }), [modelId])
+  const clientData = useMemo(
+    () => ({ modelId, apiKey: byokKey }),
+    [modelId, byokKey]
+  )
 
   // There is no endpoint to point at — the transport talks to the chat agent
   // directly, and both callbacks are server actions so the browser never holds
@@ -286,6 +334,19 @@ export function ChatThread({
     setPrompt("")
   }
 
+  useEffect(() => {
+    if (sendPromptRef) {
+      sendPromptRef.current = (text: string) => {
+        sendMessage({ text })
+      }
+    }
+    return () => {
+      if (sendPromptRef) {
+        sendPromptRef.current = null
+      }
+    }
+  }, [sendMessage, sendPromptRef])
+
   // Two halves of one cancel: `stopGeneration` signals the run so the agent
   // aborts its `streamText` (the run itself stays alive for the next message),
   // and `stopStream` settles the local status back to ready. `useChat`'s stop
@@ -340,14 +401,42 @@ export function ChatThread({
                       >
                         <BubbleContent className="flex flex-col items-start gap-2">
                           {groupMessageParts(message.parts).map((group) => {
-                            if (group.type === "text") {
+                            if (group.type === "reasoning") {
                               return (
-                                <span
+                                <ThoughtAccordion
                                   key={group.key}
-                                  className="text-[15px] font-normal leading-relaxed text-foreground/90 text-pretty"
-                                >
-                                  {group.text}
-                                </span>
+                                  text={group.text}
+                                  isStreaming={
+                                    (status === "submitted" ||
+                                      status === "streaming") &&
+                                    message.id === lastMessage?.id
+                                  }
+                                />
+                              )
+                            }
+
+                            if (group.type === "text") {
+                              if (message.role === "user") {
+                                return (
+                                  <div
+                                    key={group.key}
+                                    className="whitespace-pre-wrap text-[15px] font-normal leading-relaxed text-foreground"
+                                  >
+                                    {group.text}
+                                  </div>
+                                )
+                              }
+
+                              return (
+                                <MarkdownMessage
+                                  key={group.key}
+                                  content={group.text}
+                                  isStreaming={
+                                    (status === "submitted" ||
+                                      status === "streaming") &&
+                                    message.id === lastMessage?.id
+                                  }
+                                />
                               )
                             }
 
@@ -439,6 +528,7 @@ export function ChatThread({
           onStop={handleStop}
           modelId={modelId}
           onModelChange={setModelId}
+          gameId={gameId}
           streaming={status === "submitted" || status === "streaming"}
           disabled={status !== "ready" || pendingQuestion || outOfCredits}
           placeholder={

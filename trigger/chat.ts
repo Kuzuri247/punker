@@ -2,6 +2,7 @@ import { chat } from "@trigger.dev/sdk/ai"
 import { stepCountIs } from "ai"
 import { z } from "zod"
 
+import { deductCredits, getEntitlements } from "@/lib/billing/entitlements"
 import {
   chargeStep,
   hasCreditsToBuild,
@@ -20,16 +21,10 @@ import { DEFAULT_GAME_MODEL_ID, GAME_MODELS } from "@/lib/games/model-catalog"
 import { describeError, elapsed, logger } from "@/lib/observability"
 import { createGameTools } from "@/lib/games/tools"
 
-// Everything the browser gets to say about a turn, which is the model to run it
-// on and nothing else. The id is checked against the catalog rather than taken
-// as a string, so a tab naming a model this app doesn't offer — or one that
-// doesn't exist — is rejected here instead of at the provider.
-//
-// Optional at both levels because there is no picker yet: nothing sends client
-// data at all today, and a turn with none runs on `DEFAULT_GAME_MODEL_ID`.
 const gameClientDataSchema = z
   .object({
     modelId: z.enum(GAME_MODELS.map((model) => model.id)).optional(),
+    apiKey: z.string().optional(),
   })
   .optional()
 
@@ -165,16 +160,10 @@ export const gameChat = chat.agent({
     // mid-conversation takes effect on the next message and carries the history
     // with it. Named here rather than inline because the same choice decides
     // what the turn runs on and what it is billed at.
-    const modelId = clientData?.modelId ?? DEFAULT_GAME_MODEL_ID
+    const requestedModelId = clientData?.modelId ?? DEFAULT_GAME_MODEL_ID
+    const customApiKey = clientData?.apiKey
 
-    // A turn with nothing to answer. The history ends on the agent's own reply,
-    // which means whatever opened this turn added no message to it — a thread
-    // submitted twice, or a tab asking for a reply it has already been given.
-    // A trailing assistant message is read as a prefill for the model to carry
-    // on from, and these models refuse one outright, so the turn would die at
-    // the provider rather than quietly do nothing. Returning no stream ends it
-    // here instead: nothing generated, nothing charged, nothing added to the
-    // thread.
+    // A turn with nothing to answer.
     if (messages.at(-1)?.role === "assistant") {
       logger.warn(
         logger.fmt`Skipped a turn with nothing to answer for game ${chatId}`,
@@ -187,31 +176,32 @@ export const gameChat = chat.agent({
       return
     }
 
-    // Resolved once for the turn rather than per step: the owner of a game
-    // cannot change mid-turn, and a lookup inside `onStepEnd` would repeat it
-    // up to `MAX_STEPS` times.
     const orgId = await loadGameOrgId(chatId)
+
+    // Enforce model tier gating unless user provided a custom BYOK API key
+    const entitlements = await getEntitlements(orgId)
+    const isModelAllowed =
+      Boolean(customApiKey) || entitlements.allowedModels.includes(requestedModelId)
+
+    const modelId = isModelAllowed ? requestedModelId : DEFAULT_GAME_MODEL_ID
+    if (!isModelAllowed) {
+      logger.warn(
+        logger.fmt`Model ${requestedModelId} not allowed on tier ${entitlements.tier} without BYOK. Falling back to ${DEFAULT_GAME_MODEL_ID}`,
+        { "game.id": chatId, requestedModelId, tier: entitlements.tier }
+      )
+    }
+
+    const hasByok = Boolean(customApiKey)
 
     return streamText({
       // Spread first, so every option below still wins. Wires up the
-      // `prepareStep` behind compaction, steering and background injection —
-      // all of which silently no-op without it.
+      // `prepareStep` behind compaction, steering and background injection.
       ...chat.toStreamTextOptions({ tools }),
-      // Spread rather than assigned because what varies with the model is
-      // `model` today and may not be only that later.
-      ...gameModelSettings(modelId),
-      // `instructions`, not the deprecated `system`. Passed here rather than
-      // through `chat.prompt.set()` because the prompt is static — there is no
-      // per-chat or dashboard-versioned part of it to resolve in a hook.
+      ...gameModelSettings(modelId, { customApiKey }),
       instructions: gameInstructions,
       messages,
-      // Fires on stop and on cancel. Without it, Stop only updates the UI.
       abortSignal: signal,
       stopWhen: stepCountIs(MAX_STEPS),
-      // Per step rather than per turn, so a build that runs for minutes bills
-      // as it goes: the sidebar drops while the game is still being written,
-      // and a turn that crashes or is stopped halfway has still paid for the
-      // steps that ran. `onStepEnd`, not the deprecated `onStepFinish`.
       onStepEnd: async ({ usage, response }) => {
         if (!orgId) {
           return
@@ -223,7 +213,12 @@ export const gameChat = chat.agent({
             responseId: response.id,
             amount: priceStep({ modelId, usage }),
             agentRole: "studio",
+            bypassDeduction: hasByok,
           })
+
+          if (!hasByok) {
+            await deductCredits(orgId, 1)
+          }
         } catch (error) {
           // Deliberately swallowed. This runs between steps of a turn the
           // player is watching, and a ledger that is briefly short a row is a

@@ -6,6 +6,8 @@ export type FriendlyStepInfo = {
   label: string
   activeLabel: string
   completedLabel: string
+  targetFile?: string
+  toolName: string
   isDone: boolean
   isLoading: boolean
   hasError: boolean
@@ -35,12 +37,14 @@ export function getFriendlyStepInfo(
       ? (part.input as Record<string, unknown>)
       : {}
 
-  const targetPath =
+  const rawPath =
     typeof input.path === "string"
-      ? input.path.toLowerCase()
+      ? input.path
       : typeof input.target === "string"
-        ? input.target.toLowerCase()
+        ? input.target
         : ""
+  const targetPath = rawPath.toLowerCase()
+  const targetFile = rawPath ? rawPath.split("/").pop() || rawPath : undefined
 
   let activeLabel = "Refining gameplay"
   let completedLabel = "Gameplay refined"
@@ -133,6 +137,8 @@ export function getFriendlyStepInfo(
     label,
     activeLabel,
     completedLabel,
+    targetFile,
+    toolName,
     isDone,
     isLoading,
     hasError,

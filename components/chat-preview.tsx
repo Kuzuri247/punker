@@ -1,8 +1,11 @@
 "use client"
 
 import * as Sentry from "@sentry/nextjs"
-import { Sparkles } from "lucide-react"
+import { AlertTriangle, Download, Sparkles, X } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
+
+import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 
 type Preview =
   | { status: "loading" }
@@ -11,7 +14,7 @@ type Preview =
   | { status: "error"; message: string }
 
 /** The first failure the frame saw, as `runtime/report.js` reports it. */
-type GameError = {
+export type GameError = {
   message: string
   source: string
   line: number | null
@@ -83,12 +86,19 @@ function withoutQuery(value: string) {
 export function ChatPreview({
   gameId,
   revision,
+  onSelfHeal,
 }: {
   gameId: string
   revision: number
+  onSelfHeal?: (error: GameError) => void
 }) {
   const [preview, setPreview] = useState<Preview>({ status: "loading" })
+  const [runtimeError, setRuntimeError] = useState<GameError | null>(null)
   const frameRef = useRef<HTMLIFrameElement>(null)
+
+  useEffect(() => {
+    setRuntimeError(null)
+  }, [revision])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -184,6 +194,7 @@ export function ChatPreview({
 
       reported = true
       clearInterval(timer)
+      setRuntimeError(error)
 
       // Attributes take strings, numbers and booleans, so the halves of a
       // report the frame couldn't fill in are left out rather than sent empty:
@@ -220,6 +231,41 @@ export function ChatPreview({
     }
   }, [ready, gameId])
 
+  const [isExporting, setIsExporting] = useState(false)
+
+  async function handleExport() {
+    setIsExporting(true)
+    try {
+      const response = await fetch(`/api/games/${gameId}/download`)
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null)
+        throw new Error(
+          errorData?.error || `Export failed: HTTP ${response.status}`
+        )
+      }
+
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const filename = `game-${gameId.slice(0, 8)}-build.zip`
+
+      const anchor = document.createElement("a")
+      anchor.style.display = "none"
+      anchor.href = url
+      anchor.download = filename
+      document.body.appendChild(anchor)
+      anchor.click()
+
+      setTimeout(() => {
+        document.body.removeChild(anchor)
+        window.URL.revokeObjectURL(url)
+      }, 1000)
+    } catch (err: any) {
+      alert(err?.message || "Failed to download game export.")
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
   if (preview.status === "loading" || preview.status === "building") {
     return <MinimalistCanvasLoader status={preview.status} />
   }
@@ -235,18 +281,77 @@ export function ChatPreview({
   }
 
   return (
-    <iframe
-      ref={frameRef}
-      // Daytona signs a preview url per sandbox, not per build, so a reload
-      // normally hands the iframe the src it is already showing — and setting
-      // `src` to its current value is not a navigation. The revision keys the
-      // element instead, so React tears the old frame down and mounts a new
-      // one, which loads whatever the sandbox now serves.
-      key={preview.revision}
-      src={preview.url}
-      title="Game preview"
-      className="h-full w-full border-0 bg-white"
-    />
+    <div className="relative h-full w-full">
+      <iframe
+        ref={frameRef}
+        // Daytona signs a preview url per sandbox, not per build, so a reload
+        // normally hands the iframe the src it is already showing — and setting
+        // `src` to its current value is not a navigation. The revision keys the
+        // element instead, so React tears the old frame down and mounts a new
+        // one, which loads whatever the sandbox now serves.
+        key={preview.revision}
+        src={preview.url}
+        title="Game preview"
+        className="h-full w-full border-0 bg-white"
+      />
+      <div className="absolute top-3 right-3 z-20 flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 gap-1.5 rounded-lg border-border/80 bg-background/85 px-3 text-xs font-medium shadow-xs backdrop-blur-md hover:bg-background"
+          onClick={handleExport}
+          disabled={isExporting}
+        >
+          {isExporting ? (
+            <Spinner className="size-3.5" />
+          ) : (
+            <Download className="size-3.5" />
+          )}
+          {isExporting ? "Exporting..." : "Export Game (.zip)"}
+        </Button>
+      </div>
+
+      {runtimeError && (
+        <div className="absolute bottom-3 left-3 right-3 z-30 flex items-center justify-between gap-3 rounded-xl border border-destructive/40 bg-card/90 p-3 shadow-lg backdrop-blur-md animate-in fade-in slide-in-from-bottom-2 duration-200">
+          <div className="flex items-center gap-2.5 overflow-hidden">
+            <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-destructive/15 text-destructive">
+              <AlertTriangle className="size-4 animate-pulse" />
+            </div>
+            <div className="flex flex-col min-w-0">
+              <span className="text-xs font-semibold text-foreground">
+                Runtime Crash Detected
+              </span>
+              <span className="truncate text-[11px] text-muted-foreground font-mono">
+                {runtimeError.message}
+                {runtimeError.source &&
+                  ` (${runtimeError.source.split("/").pop()}:${runtimeError.line || 1})`}
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {onSelfHeal && (
+              <Button
+                size="sm"
+                variant="default"
+                className="h-7 gap-1.5 rounded-lg px-2.5 text-xs font-medium bg-foreground text-background hover:bg-foreground/90 transition-all active:scale-95 cursor-pointer"
+                onClick={() => onSelfHeal(runtimeError)}
+              >
+                <Sparkles className="size-3 text-amber-500" />
+                <span>Fix with AI</span>
+              </Button>
+            )}
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-7 rounded-lg text-muted-foreground hover:text-foreground cursor-pointer"
+              onClick={() => setRuntimeError(null)}
+            >
+              <X className="size-3.5" />
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 
