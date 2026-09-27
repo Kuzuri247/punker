@@ -25,6 +25,7 @@ import Link from "next/link"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 import { ChatComposer } from "@/components/chat-composer"
+import { ChatGradientBackground } from "@/components/chat-gradient-background"
 import { MarkdownMessage } from "@/components/markdown-message"
 import { StepsDropdown } from "@/components/studio/steps-dropdown"
 import { ThoughtAccordion } from "@/components/studio/thought-accordion"
@@ -375,8 +376,10 @@ export function ChatThread({
   )
 
   return (
-    <div className="flex h-full flex-col">
-      <MessageScrollerProvider>
+    <div className="relative isolate flex h-full flex-col overflow-hidden bg-background">
+      {messages.length === 0 && <ChatGradientBackground />}
+      <div className="relative z-10 flex h-full min-h-0 flex-1 flex-col">
+        <MessageScrollerProvider>
         <MessageScroller className="flex-1">
           <MessageScrollerViewport>
             <MessageScrollerContent className="mx-auto w-full max-w-3xl space-y-6 px-4 py-8 sm:px-6">
@@ -539,6 +542,7 @@ export function ChatThread({
                 : "Ask for a change…"
           }
         />
+      </div>
       </div>
     </div>
   )

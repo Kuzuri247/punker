@@ -174,13 +174,13 @@ export function GameMenu({
         </DropdownMenuTrigger>
         {/* Anchored to the trigger's right edge, which is the window's — a menu
             aligned the other way would hang off the screen. */}
-        <DropdownMenuContent align="end" className="w-52">
+        <DropdownMenuContent align="end" className="w-fit">
           <DropdownMenuItem
             onClick={handleExport}
             disabled={isExporting}
           >
             {isExporting ? <Spinner className="size-4" /> : <DownloadIcon />}
-            {isExporting ? "Exporting game..." : "Export Native (.zip / .exe)"}
+            {isExporting ? "Exporting game..." : "Export"}
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => openDialog("rename")}>
             <PencilLineIcon />
@@ -191,7 +191,7 @@ export function GameMenu({
             onClick={() => openDialog("delete")}
           >
             <Trash2Icon />
-            Move to trash
+            Delete
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

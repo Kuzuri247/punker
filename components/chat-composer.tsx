@@ -3,6 +3,7 @@
 import {
   ArrowUpIcon,
   Box,
+  Dices,
   FileText,
   Music,
   Paperclip,
@@ -28,6 +29,7 @@ import {
   InputGroupTextarea,
 } from "@/components/ui/input-group"
 import type { GameModelId } from "@/lib/games/model-catalog"
+import { suggestions } from "@/lib/games/suggestions"
 import { cn } from "@/lib/utils"
 
 export type ComposerAttachment = {
@@ -77,7 +79,18 @@ export function ChatComposer({
 }) {
   const [attachments, setAttachments] = useState<ComposerAttachment[]>([])
   const [isDragging, setIsDragging] = useState(false)
+  const [templateIndex, setTemplateIndex] = useState(-1)
+  const [isRolling, setIsRolling] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  function handleCycleTemplate() {
+    setIsRolling(true)
+    setTimeout(() => setIsRolling(false), 350)
+    const nextIndex = (templateIndex + 1) % suggestions.length
+    setTemplateIndex(nextIndex)
+    const template = suggestions[nextIndex]
+    onValueChange(template.prompt)
+  }
 
   const prompt = value.trim()
   const isUploading = attachments.some((a) => a.state === "uploading")
@@ -207,8 +220,8 @@ export function ChatComposer({
     >
       <InputGroup
         className={cn(
-          "rounded-2xl border border-border/70 bg-card/75 p-2 shadow-xs backdrop-blur-sm transition-all focus-within:border-foreground/30 focus-within:ring-2 focus-within:ring-foreground/10 hover:border-border",
-          isDragging && "border-foreground/60 ring-2 ring-foreground/20 bg-card/90"
+          "rounded-2xl border border-border/80 dark:border-white/15 bg-card dark:bg-[#1e1f20] p-2.5 shadow-lg dark:shadow-2xl dark:shadow-black/70 transition-all focus-within:border-foreground/40 focus-within:ring-2 focus-within:ring-foreground/15 hover:border-border dark:hover:border-white/25",
+          isDragging && "border-foreground/60 ring-2 ring-foreground/20 bg-card dark:bg-[#1e1f20]"
         )}
       >
         {/* Render uploaded / uploading attachments */}
@@ -284,7 +297,7 @@ export function ChatComposer({
                 : placeholder
           }
           rows={1}
-          className="field-sizing-content max-h-48 min-h-12 px-3.5 pt-2.5 text-[15px] leading-relaxed placeholder:text-muted-foreground/60"
+          className="field-sizing-content max-h-48 min-h-12 px-3.5 pt-2.5 text-[15px] font-normal leading-relaxed text-foreground placeholder:text-muted-foreground/80 dark:placeholder:text-zinc-400"
         />
 
         <InputGroupAddon align="block-end" className="gap-2 px-2 pb-1 pt-1.5">
@@ -312,34 +325,65 @@ export function ChatComposer({
                 size="icon"
                 onClick={() => fileInputRef.current?.click()}
                 title="Attach assets (Audio, Images, 3D Models, Documents)"
-                className="size-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
+                className="size-8 rounded-full text-foreground/85 hover:text-foreground hover:bg-muted/80 dark:hover:bg-white/10 transition-colors cursor-pointer"
               >
                 <Paperclip className="size-3.5" />
               </Button>
             </>
           )}
 
-          {/* Submit / Stop button */}
-          {canStop ? (
+          {/* Action cluster on the right: Dice button (left of send) + Submit/Stop button */}
+          <div className="ml-auto flex items-center gap-1.5">
+            {/* Dice template cycle button (to the left of send button) */}
             <Button
+              type="button"
+              variant="ghost"
               size="icon"
-              onClick={onStop}
-              aria-label="Stop generating"
-              className="ml-auto size-8 rounded-full bg-foreground text-background shadow-xs hover:bg-foreground/90 transition-all active:scale-95 cursor-pointer"
+              disabled={disabled}
+              onClick={handleCycleTemplate}
+              title={
+                templateIndex >= 0
+                  ? `Template (${templateIndex + 1}/${suggestions.length}): ${suggestions[templateIndex].label}`
+                  : "Cycle template ideas"
+              }
+              aria-label="Cycle template ideas"
+              className="size-8 rounded-full text-foreground hover:text-foreground bg-muted/60 hover:bg-muted dark:bg-white/10 dark:hover:bg-white/15 border border-border/60 dark:border-white/10 transition-all active:scale-90 cursor-pointer"
             >
-              <SquareIcon className="size-3.5 fill-current" />
+              <Dices
+                className={cn(
+                  "size-4 transition-transform duration-300",
+                  isRolling && "rotate-180 scale-125 text-primary"
+                )}
+              />
             </Button>
-          ) : (
-            <Button
-              type="submit"
-              size="icon"
-              disabled={!canSubmit}
-              aria-label="Send message"
-              className="ml-auto size-8 rounded-full bg-foreground text-background shadow-xs hover:bg-foreground/90 disabled:opacity-25 transition-all active:scale-95 cursor-pointer"
-            >
-              <ArrowUpIcon className="size-4" />
-            </Button>
-          )}
+
+            {/* Submit / Stop button */}
+            {canStop ? (
+              <Button
+                size="icon"
+                onClick={onStop}
+                aria-label="Stop generating"
+                className="size-8 rounded-full bg-foreground text-background shadow-xs hover:bg-foreground/90 transition-all active:scale-95 cursor-pointer"
+              >
+                <SquareIcon className="size-3.5 fill-current" />
+              </Button>
+            ) : (
+              <Button
+                type="submit"
+                size="icon"
+                disabled={!canSubmit}
+                aria-label="Send message"
+                className={cn(
+                  "size-8 rounded-full shadow-xs transition-all active:scale-95 cursor-pointer",
+                  canSubmit
+                    ? "bg-foreground text-background hover:bg-foreground/90 hover:shadow-md"
+                    : "bg-muted dark:bg-white/10 text-muted-foreground/60 dark:text-zinc-400/60 opacity-60 cursor-not-allowed border border-border/60 dark:border-white/10"
+                )}
+              >
+                <ArrowUpIcon className="size-4 stroke-[2.5]" />
+              </Button>
+            )}
+          </div>
         </InputGroupAddon>
       </InputGroup>
     </form>

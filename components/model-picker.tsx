@@ -81,14 +81,14 @@ export function ModelPicker({
       <DropdownMenu>
         <DropdownMenuTrigger
           render={
-            <InputGroupButton className="rounded-full py-1 text-xs text-muted-foreground hover:text-foreground">
-              <span className="font-sans font-medium">{selected?.name ?? modelId}</span>
+            <InputGroupButton className="rounded-full px-3 py-1.5 text-xs font-semibold text-foreground bg-muted/80 hover:bg-muted dark:bg-white/10 dark:hover:bg-white/15 border border-border/80 dark:border-white/10 shadow-2xs hover:border-foreground/30 transition-all cursor-pointer">
+              <span className="font-sans font-medium text-foreground tracking-tight">{selected?.name ?? modelId}</span>
               {hasSelectedByok && (
                 <span title="Using custom BYOK key" className="inline-flex">
                   <ShieldCheck className="size-3 text-emerald-500" />
                 </span>
               )}
-              <ChevronDownIcon className="size-3 opacity-60" />
+              <ChevronDownIcon className="size-3 text-foreground/80" />
             </InputGroupButton>
           }
         />

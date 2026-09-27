@@ -1,11 +1,12 @@
 "use client"
 
 import * as Sentry from "@sentry/nextjs"
-import { AlertTriangle, Download, Sparkles, X } from "lucide-react"
+import { AlertTriangle, Download, Maximize2, Minimize2, Sparkles, X } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
+import { cn } from "@/lib/utils"
 
 type Preview =
   | { status: "loading" }
@@ -94,7 +95,49 @@ export function ChatPreview({
 }) {
   const [preview, setPreview] = useState<Preview>({ status: "loading" })
   const [runtimeError, setRuntimeError] = useState<GameError | null>(null)
+  const [isFullscreen, setIsFullscreen] = useState(false)
   const frameRef = useRef<HTMLIFrameElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  const toggleFullscreen = () => {
+    if (!isFullscreen) {
+      if (containerRef.current?.requestFullscreen) {
+        containerRef.current.requestFullscreen().catch(() => {
+          setIsFullscreen(true)
+        })
+      } else {
+        setIsFullscreen(true)
+      }
+    } else {
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {
+          setIsFullscreen(false)
+        })
+      } else {
+        setIsFullscreen(false)
+      }
+    }
+  }
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement))
+    }
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isFullscreen) {
+        if (document.fullscreenElement) {
+          document.exitFullscreen().catch(() => {})
+        }
+        setIsFullscreen(false)
+      }
+    }
+    document.addEventListener("fullscreenchange", handleFullscreenChange)
+    window.addEventListener("keydown", handleKeyDown)
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange)
+      window.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [isFullscreen])
 
   useEffect(() => {
     setRuntimeError(null)
@@ -281,7 +324,13 @@ export function ChatPreview({
   }
 
   return (
-    <div className="relative h-full w-full">
+    <div
+      ref={containerRef}
+      className={cn(
+        "relative h-full w-full bg-background transition-all",
+        isFullscreen && "fixed inset-0 z-50 h-screen w-screen"
+      )}
+    >
       <iframe
         ref={frameRef}
         // Daytona signs a preview url per sandbox, not per build, so a reload
@@ -293,12 +342,30 @@ export function ChatPreview({
         src={preview.url}
         title="Game preview"
         className="h-full w-full border-0 bg-white"
+        allow="accelerometer; camera; encrypted-media; display-capture; geolocation; gyroscope; microphone; midi; clipboard-read; clipboard-write; fullscreen"
       />
       <div className="absolute top-3 right-3 z-20 flex items-center gap-2">
         <Button
           variant="outline"
           size="sm"
-          className="h-8 gap-1.5 rounded-lg border-border/80 bg-background/85 px-3 text-xs font-medium shadow-xs backdrop-blur-md hover:bg-background"
+          className="h-8 gap-1.5 rounded-lg border-border/80 bg-background/85 px-3 text-xs font-medium shadow-xs backdrop-blur-md hover:bg-background cursor-pointer transition-all active:scale-95"
+          onClick={toggleFullscreen}
+          title={isFullscreen ? "Exit full screen (Esc)" : "Switch to full screen"}
+        >
+          {isFullscreen ? (
+            <>
+              <Minimize2 className="size-3.5" />
+            </>
+          ) : (
+            <>
+              <Maximize2 className="size-3.5" />
+            </>
+          )}
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 gap-1.5 rounded-lg border-border/80 bg-background/85 px-3 text-xs font-medium shadow-xs backdrop-blur-md hover:bg-background cursor-pointer transition-all active:scale-95"
           onClick={handleExport}
           disabled={isExporting}
         >
@@ -307,7 +374,7 @@ export function ChatPreview({
           ) : (
             <Download className="size-3.5" />
           )}
-          {isExporting ? "Exporting..." : "Export Game (.zip)"}
+          {isExporting ? "Exporting..." : ""}
         </Button>
       </div>
 
