@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server"
 import * as Sentry from "@sentry/nextjs"
 import { eq } from "drizzle-orm"
 
+import { getEntitlements } from "@/lib/billing/entitlements"
 import { getGameSandbox } from "@/lib/daytona/utils"
 import { db, games } from "@/lib/db/client"
 import {
@@ -29,6 +30,17 @@ export async function GET(
   const { userId, orgId } = await auth()
   if (!userId) {
     return Response.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  const entitlements = await getEntitlements(orgId || userId)
+  if (!entitlements.exportZip) {
+    return Response.json(
+      {
+        error:
+          "Exporting HTML5 web bundles requires an Indie Creator, Studio Pro, or BYOK plan. Upgrade from the billing page to download your game files.",
+      },
+      { status: 403 }
+    )
   }
 
   let game = await getGame(id)
@@ -144,14 +156,16 @@ export async function GET(
         "Cache-Control": "no-cache",
       },
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Failed to generate game export archive"
     Sentry.logger.error(`Failed to export game bundle for ${id}`, {
       "game.id": id,
-      error: error?.message,
+      error: message,
     })
 
     return Response.json(
-      { error: error?.message || "Failed to generate game export archive" },
+      { error: message },
       { status: 500 }
     )
   }

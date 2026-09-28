@@ -1,10 +1,11 @@
 import { PricingTable } from "@clerk/nextjs"
 import { auth } from "@clerk/nextjs/server"
 import { eq } from "drizzle-orm"
-import { Check, ExternalLink, ShieldCheck, Sparkles } from "lucide-react"
+import { Check, ExternalLink, KeyRound, ShieldCheck, Sparkles } from "lucide-react"
 import type { Metadata } from "next"
 import Link from "next/link"
 
+import { ByokDialog } from "@/components/byok-dialog"
 import { CheckoutButton } from "@/components/checkout-button"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { getEntitlements } from "@/lib/billing/entitlements"
@@ -76,7 +77,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
         </div>
       </header>
 
-      <div className="mx-auto w-full max-w-5xl px-6 py-10">
+      <div className="mx-auto w-full max-w-6xl px-6 py-10">
         <div className="flex flex-col gap-10">
           {/* Notifications */}
           {params.success === "true" && (
@@ -124,7 +125,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
               )}
             </div>
 
-            <p className="mt-4 max-w-xl text-xs leading-relaxed text-muted-foreground">
+            <p className="mt-4 max-w-2xl text-xs leading-relaxed text-muted-foreground">
               Credits power frontier AI reasoning (Gemini 3.8 Flash, Claude 3.7 Sonnet,
               GPT-4o), dedicated Daytona isolated sandbox execution, and real-time game
               generation turns. Unused subscription credits roll over every month.
@@ -144,21 +145,31 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                 </p>
               </div>
 
-              {isPaidActive && (
-                <Link
-                  href="/customer-portal"
-                  className={buttonVariants({ variant: "outline", size: "sm" })}
-                >
-                  Customer Portal
-                  <ExternalLink className="ml-1.5 size-3.5" />
-                </Link>
-              )}
+              <div className="flex items-center gap-2">
+                <ByokDialog
+                  trigger={
+                    <Button variant="outline" size="sm">
+                      <KeyRound className="mr-1.5 size-3.5" />
+                      Configure BYOK Keys
+                    </Button>
+                  }
+                />
+                {isPaidActive && (
+                  <Link
+                    href="/customer-portal"
+                    className={buttonVariants({ variant: "outline", size: "sm" })}
+                  >
+                    Customer Portal
+                    <ExternalLink className="ml-1.5 size-3.5" />
+                  </Link>
+                )}
+              </div>
             </div>
 
-            <div className="grid gap-6 sm:grid-cols-3">
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
               {/* Free Explorer */}
               <div
-                className={`relative flex flex-col justify-between rounded-2xl border p-6 transition-all ${
+                className={`relative flex flex-col justify-between rounded-2xl border p-5 transition-all ${
                   currentTier === "free"
                     ? "border-primary/50 bg-card shadow-sm ring-1 ring-primary/20"
                     : "border-border/70 bg-card/40"
@@ -167,10 +178,10 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                 <div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-semibold text-foreground">
-                      Free Explorer
+                      Free / Explorer
                     </span>
                     {currentTier === "free" && (
-                      <span className="rounded-full bg-muted px-2.5 py-0.5 text-[10px] font-medium text-foreground">
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-foreground">
                         Current
                       </span>
                     )}
@@ -181,27 +192,31 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                     </span>
                     <span className="ml-1 text-xs text-muted-foreground">/mo</span>
                   </div>
-                  <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+                  <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
                     Starter studio for experimenting with basic 3D games and demos.
                   </p>
 
-                  <div className="mt-6 space-y-2.5 text-xs text-muted-foreground">
+                  <div className="mt-5 space-y-2 text-xs text-muted-foreground">
                     <div className="flex items-center gap-2">
                       <Check className="size-3.5 text-foreground shrink-0" />
-                      <span>$1.00 starter inference credits</span>
+                      <span>10 setup credits</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Check className="size-3.5 text-foreground shrink-0" />
-                      <span>1 active Daytona sandbox</span>
+                      <span>5-min sandbox timeout</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Check className="size-3.5 text-foreground shrink-0" />
-                      <span>Gemini 3.8 Flash & mini models</span>
+                      <span>1 active sandbox (1GB)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Check className="size-3.5 text-foreground shrink-0" />
+                      <span>Play in-browser (WebGL preview)</span>
                     </div>
                   </div>
                 </div>
 
-                <div className="mt-8">
+                <div className="mt-6">
                   {currentTier === "free" ? (
                     <Button variant="outline" size="default" disabled className="w-full">
                       Active Plan
@@ -221,16 +236,16 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                 </div>
               </div>
 
-              {/* Creator / Pro */}
+              {/* Indie Creator */}
               <div
-                className={`relative flex flex-col justify-between rounded-2xl border-2 p-6 transition-all ${
+                className={`relative flex flex-col justify-between rounded-2xl border-2 p-5 transition-all ${
                   currentTier === "pro"
                     ? "border-primary bg-card shadow-md"
                     : "border-foreground/80 bg-card/90 shadow-sm"
                 }`}
               >
-                <div className="absolute -top-3 right-5">
-                  <span className="rounded-full bg-foreground text-background px-2.5 py-0.5 text-[10px] font-medium shadow-xs">
+                <div className="absolute -top-3 right-4">
+                  <span className="rounded-full bg-foreground text-background px-2 py-0.5 text-[10px] font-medium shadow-xs">
                     Popular
                   </span>
                 </div>
@@ -238,7 +253,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                 <div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-semibold text-foreground">
-                      Creator
+                      Indie Creator
                     </span>
                     {currentTier === "pro" && (
                       <span className="rounded-full bg-emerald-500/20 text-emerald-400 px-2 py-0.5 text-[10px] font-medium">
@@ -252,33 +267,33 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                     </span>
                     <span className="ml-1 text-xs text-muted-foreground">/mo</span>
                   </div>
-                  <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+                  <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
                     For active game creators and developers building rich three.js worlds.
                   </p>
 
-                  <div className="mt-6 space-y-2.5 text-xs text-muted-foreground">
+                  <div className="mt-5 space-y-2 text-xs text-muted-foreground">
                     <div className="flex items-center gap-2">
                       <Check className="size-3.5 text-emerald-500 shrink-0" />
                       <span className="text-foreground">
-                        $25.00/mo credits (~350 turns)
+                        300 generation credits/mo
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Check className="size-3.5 text-emerald-500 shrink-0" />
-                      <span>5 persistent Daytona sandboxes</span>
+                      <span>10-min timeout, auto-hibernation</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Check className="size-3.5 text-emerald-500 shrink-0" />
-                      <span>Access to Claude 3.7 & GPT-4o</span>
+                      <span>3 sandboxes (1 vCPU, 2GB)</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Check className="size-3.5 text-emerald-500 shrink-0" />
-                      <span>Monthly credit rollover</span>
+                      <span>HTML5 Web Bundle (.zip) download</span>
                     </div>
                   </div>
                 </div>
 
-                <div className="mt-8">
+                <div className="mt-6">
                   {currentTier === "pro" ? (
                     <Link
                       href="/customer-portal"
@@ -300,7 +315,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
 
               {/* Studio Pro */}
               <div
-                className={`relative flex flex-col justify-between rounded-2xl border p-6 transition-all ${
+                className={`relative flex flex-col justify-between rounded-2xl border p-5 transition-all ${
                   currentTier === "studio"
                     ? "border-primary bg-card shadow-md ring-1 ring-primary/20"
                     : "border-border/70 bg-card/40"
@@ -323,33 +338,33 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                     </span>
                     <span className="ml-1 text-xs text-muted-foreground">/mo</span>
                   </div>
-                  <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+                  <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
                     For production studios with heavy AI turn usage and team sandboxes.
                   </p>
 
-                  <div className="mt-6 space-y-2.5 text-xs text-muted-foreground">
+                  <div className="mt-5 space-y-2 text-xs text-muted-foreground">
                     <div className="flex items-center gap-2">
                       <Check className="size-3.5 text-emerald-500 shrink-0" />
                       <span className="text-foreground">
-                        $70.00/mo credits (~1,000 turns)
+                        1,200 generation credits/mo
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Check className="size-3.5 text-emerald-500 shrink-0" />
-                      <span>20 sandboxes with 8GB RAM</span>
+                      <span>Gemini 2.0 Pro deep reasoning</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Check className="size-3.5 text-emerald-500 shrink-0" />
-                      <span>Priority Trigger.dev queues</span>
+                      <span>30-min timeout, 5 sandboxes (4GB)</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Check className="size-3.5 text-emerald-500 shrink-0" />
-                      <span>Dedicated concurrency slots</span>
+                      <span>Windows & Mac standalone export</span>
                     </div>
                   </div>
                 </div>
 
-                <div className="mt-8">
+                <div className="mt-6">
                   {currentTier === "studio" ? (
                     <Link
                       href="/customer-portal"
@@ -365,6 +380,84 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                     <CheckoutButton tier="studio" variant="secondary" className="w-full">
                       Upgrade to Studio Pro
                     </CheckoutButton>
+                  )}
+                </div>
+              </div>
+
+              {/* BYOK Hacker */}
+              <div
+                className={`relative flex flex-col justify-between rounded-2xl border p-5 transition-all ${
+                  currentTier === "byok"
+                    ? "border-primary bg-card shadow-md ring-1 ring-primary/20"
+                    : "border-border/70 bg-card/40"
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-foreground">
+                      BYOK Hacker
+                    </span>
+                    {currentTier === "byok" && (
+                      <span className="rounded-full bg-emerald-500/20 text-emerald-400 px-2 py-0.5 text-[10px] font-medium">
+                        Active
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-3 flex items-baseline">
+                    <span className="text-3xl font-bold tracking-tight text-foreground">
+                      $10
+                    </span>
+                    <span className="ml-1 text-xs text-muted-foreground">/mo</span>
+                    <span className="ml-2 text-[11px] text-muted-foreground/80">or $69 lifetime</span>
+                  </div>
+                  <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                    Bring your own Gemini/Claude/OpenAI keys. Zero token limits.
+                  </p>
+
+                  <div className="mt-5 space-y-2 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <Check className="size-3.5 text-emerald-500 shrink-0" />
+                      <span className="text-foreground">
+                        Unlimited turns (you pay provider)
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Check className="size-3.5 text-emerald-500 shrink-0" />
+                      <span>15-min sandbox session timeout</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Check className="size-3.5 text-emerald-500 shrink-0" />
+                      <span>HTML5 + Standalone executable export</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Check className="size-3.5 text-emerald-500 shrink-0" />
+                      <span>Zero token markup</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-6 flex flex-col gap-2">
+                  {currentTier === "byok" ? (
+                    <ByokDialog
+                      trigger={
+                        <Button variant="outline" size="default" className="w-full">
+                          Configure API Keys
+                        </Button>
+                      }
+                    />
+                  ) : (
+                    <>
+                      <CheckoutButton tier="byok" variant="outline" className="w-full">
+                        Subscribe ($10/mo)
+                      </CheckoutButton>
+                      <ByokDialog
+                        trigger={
+                          <Button variant="ghost" size="xs" className="w-full text-[11px]">
+                            Enter Keys Directly
+                          </Button>
+                        }
+                      />
+                    </>
                   )}
                 </div>
               </div>

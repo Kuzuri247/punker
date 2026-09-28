@@ -1,9 +1,9 @@
 import { eq, sql } from "drizzle-orm"
 
 import { creditWallets, db, subscriptions } from "@/lib/db/client"
-import { GAME_MODELS, type GameModelId } from "@/lib/games/model-catalog"
+import { type GameModelId } from "@/lib/games/model-catalog"
 
-export type SubscriptionTier = "free" | "pro" | "studio"
+export type SubscriptionTier = "free" | "pro" | "studio" | "byok"
 
 export interface TierConfig {
   name: string
@@ -15,17 +15,19 @@ export interface TierConfig {
   autoStopMinutes: number
   allowedModels: GameModelId[]
   priorityQueue: boolean
+  exportZip: boolean
+  exportExecutable: boolean
 }
 
 export const TIER_CONFIGS: Record<SubscriptionTier, TierConfig> = {
   free: {
-    name: "Free / Starter",
+    name: "Free / Explorer",
     priceMonthlyDollars: 0,
-    monthlyCredits: 50,
+    monthlyCredits: 10,
     sandboxMemoryMb: 1024,
     sandboxVcpu: 1,
     maxConcurrentSandboxes: 1,
-    autoStopMinutes: 10,
+    autoStopMinutes: 5,
     allowedModels: [
       "gemini-3.8-flash",
       "gemini-3.6-flash",
@@ -34,14 +36,37 @@ export const TIER_CONFIGS: Record<SubscriptionTier, TierConfig> = {
       "gpt-4o-mini",
     ],
     priorityQueue: false,
+    exportZip: false,
+    exportExecutable: false,
   },
   pro: {
-    name: "Pro Builder",
+    name: "Indie Creator",
     priceMonthlyDollars: 19,
-    monthlyCredits: 1000,
+    monthlyCredits: 300,
+    sandboxMemoryMb: 2048,
+    sandboxVcpu: 1,
+    maxConcurrentSandboxes: 3,
+    autoStopMinutes: 10,
+    allowedModels: [
+      "gemini-3.8-flash",
+      "gemini-3.6-flash",
+      "gemini-3.5-flash-lite",
+      "claude-3-7-sonnet",
+      "claude-3-5-haiku",
+      "gpt-4o",
+      "gpt-4o-mini",
+    ],
+    priorityQueue: false,
+    exportZip: true,
+    exportExecutable: false,
+  },
+  studio: {
+    name: "Studio Pro",
+    priceMonthlyDollars: 49,
+    monthlyCredits: 1200,
     sandboxMemoryMb: 4096,
     sandboxVcpu: 2,
-    maxConcurrentSandboxes: 3,
+    maxConcurrentSandboxes: 5,
     autoStopMinutes: 30,
     allowedModels: [
       "gemini-3.8-flash",
@@ -52,16 +77,18 @@ export const TIER_CONFIGS: Record<SubscriptionTier, TierConfig> = {
       "gpt-4o",
       "gpt-4o-mini",
     ],
-    priorityQueue: false,
+    priorityQueue: true,
+    exportZip: true,
+    exportExecutable: true,
   },
-  studio: {
-    name: "Studio Max",
-    priceMonthlyDollars: 49,
-    monthlyCredits: 3500,
-    sandboxMemoryMb: 8192,
-    sandboxVcpu: 4,
-    maxConcurrentSandboxes: 10,
-    autoStopMinutes: 60,
+  byok: {
+    name: "BYOK Hacker",
+    priceMonthlyDollars: 10,
+    monthlyCredits: 999999,
+    sandboxMemoryMb: 2048,
+    sandboxVcpu: 1,
+    maxConcurrentSandboxes: 3,
+    autoStopMinutes: 15,
     allowedModels: [
       "gemini-3.8-flash",
       "gemini-3.6-flash",
@@ -71,7 +98,9 @@ export const TIER_CONFIGS: Record<SubscriptionTier, TierConfig> = {
       "gpt-4o",
       "gpt-4o-mini",
     ],
-    priorityQueue: true,
+    priorityQueue: false,
+    exportZip: true,
+    exportExecutable: true,
   },
 }
 
@@ -85,6 +114,8 @@ export interface UserEntitlements {
   autoStopMinutes: number
   allowedModels: GameModelId[]
   canBuild: boolean
+  exportZip: boolean
+  exportExecutable: boolean
 }
 
 /**
@@ -106,6 +137,8 @@ export async function getEntitlements(
       autoStopMinutes: freeConfig.autoStopMinutes,
       allowedModels: freeConfig.allowedModels,
       canBuild: false,
+      exportZip: freeConfig.exportZip,
+      exportExecutable: freeConfig.exportExecutable,
     }
   }
 
@@ -125,20 +158,20 @@ export async function getEntitlements(
 
   const config = TIER_CONFIGS[tier] || TIER_CONFIGS.free
 
-  // 2. Look up credit wallet balance (initialize with 50 free credits if no row exists)
+  // 2. Look up credit wallet balance (initialize with 10 free credits if no row exists)
   const walletRows = await db
     .select()
     .from(creditWallets)
     .where(eq(creditWallets.userId, userIdOrOrgId))
     .limit(1)
 
-  let balance = 50
+  let balance = 10
   if (walletRows.length === 0) {
     await db
       .insert(creditWallets)
       .values({
         userId: userIdOrOrgId,
-        balance: 50,
+        balance: 10,
       })
       .onConflictDoNothing()
   } else {
@@ -155,7 +188,9 @@ export async function getEntitlements(
       activeSub?.maxConcurrentSandboxes ?? config.maxConcurrentSandboxes,
     autoStopMinutes: config.autoStopMinutes,
     allowedModels: config.allowedModels,
-    canBuild: balance > 0,
+    canBuild: tier === "byok" || balance > 0,
+    exportZip: config.exportZip,
+    exportExecutable: config.exportExecutable,
   }
 }
 

@@ -22,6 +22,8 @@ export const DODO_RETURN_URL =
 export const TIER_PRODUCT_IDS: Record<string, string> = {
   pro: process.env.DODO_PRODUCT_PRO_ID || "p_pro_tier",
   studio: process.env.DODO_PRODUCT_STUDIO_ID || "p_studio_tier",
+  byok: process.env.DODO_PRODUCT_BYOK_ID || "p_byok_tier",
+  byok_lifetime: process.env.DODO_PRODUCT_BYOK_LIFETIME_ID || "p_byok_lifetime",
 }
 
 /**

@@ -1,6 +1,7 @@
 import { task } from "@trigger.dev/sdk"
 import { eq } from "drizzle-orm"
 
+import { getEntitlements } from "@/lib/billing/entitlements"
 import { getGameSandbox } from "@/lib/daytona/utils"
 import { db, games } from "@/lib/db/client"
 import {
@@ -10,7 +11,7 @@ import {
   generateStartBat,
   generateStartSh,
 } from "@/lib/games/export-templates"
-import { describeError, elapsed, logger } from "@/lib/observability"
+import { elapsed, logger } from "@/lib/observability"
 
 export interface PackageExecutablePayload {
   gameId: string
@@ -60,6 +61,13 @@ export const packageExecutable = task({
 
     if (!game) {
       throw new Error(`Game not found: ${gameId}`)
+    }
+
+    const entitlements = await getEntitlements(game.orgId)
+    if (!entitlements.exportExecutable) {
+      throw new Error(
+        "Packaging standalone desktop executables is exclusive to Studio Pro and BYOK tiers."
+      )
     }
 
     const title = appName || game.title || "Game"

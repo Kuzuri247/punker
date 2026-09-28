@@ -42,8 +42,60 @@ export async function POST(req: NextRequest) {
         totalAmount: data.total_amount,
       })
 
+      const userId =
+        data.metadata?.clerkUserId ||
+        data.metadata?.userId ||
+        data.metadata?.user_id ||
+        data.customer?.metadata?.clerkUserId ||
+        data.customer?.metadata?.userId
+
+      // If this is a one-time BYOK Lifetime license purchase
+      const tierRaw = String(data.metadata?.tier || "").toLowerCase()
+      const isByokLifetime =
+        tierRaw.includes("byok_lifetime") ||
+        tierRaw === "byok" ||
+        (process.env.DODO_PRODUCT_BYOK_LIFETIME_ID &&
+          data.product_cart?.some(
+            (p) => p.product_id === process.env.DODO_PRODUCT_BYOK_LIFETIME_ID
+          ))
+
+      if (userId && isByokLifetime) {
+        const byokConfig = TIER_CONFIGS.byok
+        const customerId = data.customer?.customer_id || "cust_unknown"
+
+        await db
+          .insert(subscriptions)
+          .values({
+            id: `lifetime_${data.payment_id}`,
+            userId,
+            customerId,
+            tier: "byok",
+            status: "active",
+            currentPeriodEnd: null, // Never expires
+            sandboxMemoryMb: byokConfig.sandboxMemoryMb,
+            sandboxVcpu: byokConfig.sandboxVcpu,
+            maxConcurrentSandboxes: byokConfig.maxConcurrentSandboxes,
+          })
+          .onConflictDoUpdate({
+            target: subscriptions.userId,
+            set: {
+              id: `lifetime_${data.payment_id}`,
+              customerId,
+              tier: "byok",
+              status: "active",
+              currentPeriodEnd: null,
+              sandboxMemoryMb: byokConfig.sandboxMemoryMb,
+              sandboxVcpu: byokConfig.sandboxVcpu,
+              maxConcurrentSandboxes: byokConfig.maxConcurrentSandboxes,
+              updatedAt: new Date(),
+            },
+          })
+
+        await grantCredits(userId, byokConfig.monthlyCredits)
+        return
+      }
+
       // If payment has credit top-up metadata, grant the credits
-      const userId = data.metadata?.userId || data.metadata?.user_id
       const creditAmount = parseInt(
         String(data.metadata?.creditAmount || "0"),
         10
@@ -80,15 +132,35 @@ export async function POST(req: NextRequest) {
       })
 
       const userId =
+        data.metadata?.clerkUserId ||
         data.metadata?.userId ||
         data.metadata?.user_id ||
         data.metadata?.orgId ||
+        data.customer?.metadata?.clerkUserId ||
         data.customer?.metadata?.userId ||
         data.customer?.customer_id
 
-      const tierRaw = String(data.metadata?.tier || "pro").toLowerCase()
-      const tier: SubscriptionTier =
-        tierRaw === "studio" ? "studio" : tierRaw === "pro" ? "pro" : "free"
+      const tierRaw = String(data.metadata?.tier || "").toLowerCase()
+      let tier: SubscriptionTier = "pro"
+      if (
+        tierRaw.includes("studio") ||
+        data.product_id === process.env.DODO_PRODUCT_STUDIO_ID
+      ) {
+        tier = "studio"
+      } else if (
+        tierRaw.includes("byok") ||
+        data.product_id === process.env.DODO_PRODUCT_BYOK_ID ||
+        data.product_id === process.env.DODO_PRODUCT_BYOK_LIFETIME_ID
+      ) {
+        tier = "byok"
+      } else if (
+        tierRaw.includes("pro") ||
+        tierRaw.includes("creator") ||
+        data.product_id === process.env.DODO_PRODUCT_PRO_ID
+      ) {
+        tier = "pro"
+      }
+
       const config = TIER_CONFIGS[tier]
 
       if (userId) {
@@ -138,14 +210,34 @@ export async function POST(req: NextRequest) {
       })
 
       const userId =
+        data.metadata?.clerkUserId ||
         data.metadata?.userId ||
         data.metadata?.user_id ||
         data.metadata?.orgId ||
+        data.customer?.metadata?.clerkUserId ||
         data.customer?.customer_id
 
-      const tierRaw = String(data.metadata?.tier || "pro").toLowerCase()
-      const tier: SubscriptionTier =
-        tierRaw === "studio" ? "studio" : tierRaw === "pro" ? "pro" : "free"
+      const tierRaw = String(data.metadata?.tier || "").toLowerCase()
+      let tier: SubscriptionTier = "pro"
+      if (
+        tierRaw.includes("studio") ||
+        data.product_id === process.env.DODO_PRODUCT_STUDIO_ID
+      ) {
+        tier = "studio"
+      } else if (
+        tierRaw.includes("byok") ||
+        data.product_id === process.env.DODO_PRODUCT_BYOK_ID ||
+        data.product_id === process.env.DODO_PRODUCT_BYOK_LIFETIME_ID
+      ) {
+        tier = "byok"
+      } else if (
+        tierRaw.includes("pro") ||
+        tierRaw.includes("creator") ||
+        data.product_id === process.env.DODO_PRODUCT_PRO_ID
+      ) {
+        tier = "pro"
+      }
+
       const config = TIER_CONFIGS[tier]
 
       if (userId) {
@@ -170,9 +262,11 @@ export async function POST(req: NextRequest) {
       })
 
       const userId =
+        data.metadata?.clerkUserId ||
         data.metadata?.userId ||
         data.metadata?.user_id ||
         data.metadata?.orgId ||
+        data.customer?.metadata?.clerkUserId ||
         data.customer?.customer_id
 
       if (userId) {

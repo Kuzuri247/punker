@@ -8,7 +8,7 @@ import type { VariantProps } from "class-variance-authority"
 
 interface CheckoutButtonProps {
   productId?: string
-  tier?: "pro" | "studio"
+  tier?: "pro" | "studio" | "byok" | "byok_lifetime" | string
   children?: React.ReactNode
   className?: string
   variant?: VariantProps<typeof buttonVariants>["variant"]
@@ -54,8 +54,15 @@ export function CheckoutButton({
       })
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error || "Unable to create checkout session")
+        const text = await response.text()
+        let errorMessage = "Unable to create checkout session"
+        try {
+          const json = JSON.parse(text)
+          errorMessage = json.error || text
+        } catch {
+          errorMessage = text || errorMessage
+        }
+        throw new Error(errorMessage)
       }
 
       const { checkout_url } = await response.json()
