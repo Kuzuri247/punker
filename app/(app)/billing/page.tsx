@@ -116,9 +116,16 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                     Active Plan: {entitlements.tierConfig.name}
                   </div>
                   {currentSub?.currentPeriodEnd && (
-                    <span className="text-[11px] text-muted-foreground">
+                    <span
+                      className="text-[11px] text-muted-foreground"
+                      suppressHydrationWarning
+                    >
                       Renews on{" "}
-                      {new Date(currentSub.currentPeriodEnd).toLocaleDateString()}
+                      {new Date(currentSub.currentPeriodEnd).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
                     </span>
                   )}
                 </div>
@@ -147,11 +154,13 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
 
               <div className="flex items-center gap-2">
                 <ByokDialog
+                  triggerVariant="outline"
+                  triggerSize="sm"
                   trigger={
-                    <Button variant="outline" size="sm">
+                    <>
                       <KeyRound className="mr-1.5 size-3.5" />
                       Configure BYOK Keys
-                    </Button>
+                    </>
                   }
                 />
                 {isPaidActive && (
@@ -439,11 +448,10 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                 <div className="mt-6 flex flex-col gap-2">
                   {currentTier === "byok" ? (
                     <ByokDialog
-                      trigger={
-                        <Button variant="outline" size="default" className="w-full">
-                          Configure API Keys
-                        </Button>
-                      }
+                      triggerVariant="outline"
+                      triggerSize="default"
+                      triggerClassName="w-full"
+                      trigger="Configure API Keys"
                     />
                   ) : (
                     <>
@@ -451,11 +459,10 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
                         Subscribe ($10/mo)
                       </CheckoutButton>
                       <ByokDialog
-                        trigger={
-                          <Button variant="ghost" size="xs" className="w-full text-[11px]">
-                            Enter Keys Directly
-                          </Button>
-                        }
+                        triggerVariant="ghost"
+                        triggerSize="xs"
+                        triggerClassName="w-full text-[11px]"
+                        trigger="Enter Keys Directly"
                       />
                     </>
                   )}

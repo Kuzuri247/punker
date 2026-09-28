@@ -9,7 +9,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -23,17 +22,32 @@ import {
 
 export function ByokDialog({
   trigger,
+  triggerVariant = "outline",
+  triggerSize = "default",
+  triggerClassName,
   open: controlledOpen,
   onOpenChange: controlledOnOpenChange,
 }: {
   trigger?: React.ReactNode
+  triggerVariant?: "default" | "outline" | "secondary" | "ghost"
+  triggerSize?: "default" | "sm" | "xs" | "lg" | "icon"
+  triggerClassName?: string
   open?: boolean
   onOpenChange?: (open: boolean) => void
 }) {
   const [internalOpen, setInternalOpen] = React.useState(false)
   const isControlled = controlledOpen !== undefined
   const isOpen = isControlled ? controlledOpen : internalOpen
-  const setIsOpen = isControlled ? controlledOnOpenChange : setInternalOpen
+  const handleOpenChange = React.useCallback(
+    (nextOpen: boolean) => {
+      if (isControlled) {
+        controlledOnOpenChange?.(nextOpen)
+      } else {
+        setInternalOpen(nextOpen)
+      }
+    },
+    [isControlled, controlledOnOpenChange]
+  )
 
   const [keys, setKeys] = React.useState<Record<ModelProvider, string>>({
     anthropic: "",
@@ -99,9 +113,22 @@ export function ByokDialog({
   ]
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      {trigger && <DialogTrigger render={trigger as any} />}
-      <DialogContent className="max-w-md sm:max-w-lg p-5">
+    <>
+      {trigger && (
+        <Button
+          type="button"
+          variant={triggerVariant}
+          size={triggerSize}
+          className={triggerClassName}
+          onClick={() => handleOpenChange(true)}
+          aria-haspopup="dialog"
+          aria-expanded={isOpen}
+        >
+          {trigger}
+        </Button>
+      )}
+      <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+        <DialogContent className="max-w-md sm:max-w-lg p-5">
         <DialogHeader className="gap-1.5 pb-2">
           <div className="flex items-center gap-2">
             <div className="flex size-7 items-center justify-center rounded-lg bg-foreground/10 text-foreground">
@@ -202,5 +229,6 @@ export function ByokDialog({
         )}
       </DialogContent>
     </Dialog>
-  )
+  </>
+)
 }

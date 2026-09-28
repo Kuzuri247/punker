@@ -3,6 +3,27 @@
 import * as React from "react"
 import { ThemeProvider as NextThemesProvider, useTheme } from "next-themes"
 
+// React 19 + Next.js logs a development warning when next-themes renders its inline
+// anti-flicker SSR script inside a React component. The script is intentionally used
+// for pre-hydration theme initialization, so we filter this benign warning.
+if (process.env.NODE_ENV === "development") {
+  const consoleErrorKey = Symbol.for("punker.theme.console.error.patched")
+  const g = globalThis as unknown as Record<symbol, boolean>
+  if (!g[consoleErrorKey]) {
+    g[consoleErrorKey] = true
+    const originalError = console.error
+    console.error = (...args: unknown[]) => {
+      if (
+        typeof args[0] === "string" &&
+        args[0].includes("Encountered a script tag while rendering React component")
+      ) {
+        return
+      }
+      originalError.apply(console, args)
+    }
+  }
+}
+
 function ThemeProvider({
   children,
   ...props
