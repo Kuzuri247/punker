@@ -18,7 +18,7 @@ import {
   isGameModelId,
 } from "@/lib/games/model-catalog"
 import { google } from "@/lib/games/models"
-import { truncateTitle } from "@/lib/games/title"
+import { slugifyTitle, truncateTitle } from "@/lib/games/title"
 import { describeError, elapsed } from "@/lib/observability"
 
 const TITLE_MODEL = "gemini-3.5-flash-lite"
@@ -126,11 +126,15 @@ export async function createGame(prompt: string, modelId: GameModelId) {
   // reachable by direct POST, and the value goes straight into the URL below.
   const model = isGameModelId(modelId) ? modelId : DEFAULT_GAME_MODEL_ID
 
+  const title = truncateTitle(await generateTitle(trimmedPrompt))
+  const slug = slugifyTitle(title)
+
   const [game] = await db
     .insert(games)
     .values({
       orgId,
-      title: truncateTitle(await generateTitle(trimmedPrompt)),
+      title,
+      slug,
       messages: [
         {
           id: generateMessageId(),
@@ -139,7 +143,7 @@ export async function createGame(prompt: string, modelId: GameModelId) {
         },
       ],
     })
-    .returning({ id: games.id })
+    .returning({ id: games.id, slug: games.slug })
 
   // The funnel's first step, and the one every other signal here hangs off. The
   // prompt itself is not logged — only its length: prompts are kept out of
@@ -170,10 +174,12 @@ export async function createGame(prompt: string, modelId: GameModelId) {
   // page falls back to it — so the ordinary URL stays `/games/{id}`.
   //
   // `redirect` throws, so nothing may follow it here.
+  const urlTarget = game.slug || slug || game.id
+
   redirect(
     model === DEFAULT_GAME_MODEL_ID
-      ? `/games/${game.id}`
-      : `/games/${game.id}?model=${model}`
+      ? `/games/${urlTarget}`
+      : `/games/${urlTarget}?model=${model}`
   )
 }
 
@@ -203,7 +209,7 @@ export async function renameGame(gameId: string, title: string) {
   // statement safe to read on its own.
   await db
     .update(games)
-    .set({ title: trimmed })
+    .set({ title: trimmed, slug: slugifyTitle(trimmed) })
     .where(and(eq(games.id, gameId), eq(games.orgId, orgId)))
 
   // The title itself is not logged, for the same reason prompts are not:

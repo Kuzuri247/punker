@@ -2,13 +2,16 @@ import "server-only"
 
 import { auth } from "@clerk/nextjs/server"
 import { and, desc, eq } from "drizzle-orm"
+import { cache } from "react"
 
 import { db, games, type Game } from "@/lib/db"
+import { slugifyTitle } from "@/lib/games/title"
 
 export type GameSummary = {
   id: string
   orgId: string
   title: string
+  slug: string | null
   sandboxId: string | null
   createdAt: Date
   updatedAt: Date
@@ -32,6 +35,7 @@ export async function listGames(): Promise<GameSummary[]> {
       id: games.id,
       orgId: games.orgId,
       title: games.title,
+      slug: games.slug,
       sandboxId: games.sandboxId,
       createdAt: games.createdAt,
       updatedAt: games.updatedAt,
@@ -48,20 +52,40 @@ const UUID_RE =
 
 /**
  * A single game, or `undefined` when it doesn't exist or belongs to another
- * organization.
+ * organization. Looks up by UUID or by title slug.
  */
-export async function getGame(id: string): Promise<Game | undefined> {
-  const { orgId } = await auth()
+export const getGame = cache(async function getGame(
+  idOrSlug: string,
+  explicitOrgId?: string
+): Promise<Game | undefined> {
+  const orgId = explicitOrgId ?? (await auth()).orgId
 
-  if (!orgId || !UUID_RE.test(id)) {
+  if (!orgId || !idOrSlug) {
     return undefined
   }
 
-  const [game] = await db
+  // 1. If it's a valid UUID, look up by primary key id
+  if (UUID_RE.test(idOrSlug)) {
+    const [game] = await db
+      .select()
+      .from(games)
+      .where(and(eq(games.id, idOrSlug), eq(games.orgId, orgId)))
+      .limit(1)
+
+    if (game) return game
+  }
+
+  // 2. Query by slug
+  const [bySlug] = await db
     .select()
     .from(games)
-    .where(and(eq(games.id, id), eq(games.orgId, orgId)))
+    .where(and(eq(games.slug, idOrSlug), eq(games.orgId, orgId)))
     .limit(1)
 
-  return game
-}
+  if (bySlug) return bySlug
+
+  // 3. Fallback: match by slugified title for legacy rows
+  const orgGames = await db.select().from(games).where(eq(games.orgId, orgId))
+
+  return orgGames.find((g) => (g.slug || slugifyTitle(g.title)) === idOrSlug)
+})

@@ -8,6 +8,7 @@ import { usePathname } from "next/navigation"
 
 import { SettingsMenu } from "@/components/settings-menu"
 import { GameMenu } from "@/components/game-menu"
+import { slugifyTitle } from "@/lib/games/title"
 import { Empty, EmptyDescription } from "@/components/ui/empty"
 import {
   Popover,
@@ -67,7 +68,7 @@ export function AppSidebar({
             <SidebarMenuItem>
               <SidebarMenuButton
                 isActive={pathname === "/"}
-                render={<Link href="/" />}
+                render={<Link href="/" prefetch={true} />}
               >
                 <SquarePenIcon />
                 <span>New game</span>
@@ -86,28 +87,31 @@ export function AppSidebar({
               </Empty>
             ) : (
               <SidebarMenu className="group-data-[collapsible=icon]:hidden">
-                {games.map((game) => (
-                  <SidebarMenuItem key={game.id}>
-                    <SidebarMenuButton
-                      isActive={pathname === `/games/${game.id}`}
-                      render={<Link href={`/games/${game.id}`} />}
-                    >
-                      <span>{game.title}</span>
-                    </SidebarMenuButton>
-                    {/* The same menu the game's own header has. Rendered as a
-                        `SidebarMenuAction` so it sits inside the row rather
-                        than beside it: the row is a link, and a button nested
-                        in one would be a link that is sometimes not. Hidden
-                        until the row is hovered or focused — and, once the
-                        menu is open, kept visible by the trigger's
-                        `aria-expanded`. */}
-                    <GameMenu
-                      gameId={game.id}
-                      title={game.title}
-                      trigger={<SidebarMenuAction showOnHover />}
-                    />
-                  </SidebarMenuItem>
-                ))}
+                {games.map((game) => {
+                  const slug = game.slug || slugifyTitle(game.title) || game.id
+                  const isCurrent =
+                    pathname === `/games/${slug}` ||
+                    pathname === `/games/${game.id}` ||
+                    pathname === `/games/${slugifyTitle(game.title)}`
+
+                  return (
+                    <SidebarMenuItem key={game.id}>
+                      <SidebarMenuButton
+                        isActive={isCurrent}
+                        render={
+                          <Link href={`/games/${slug}`} prefetch={true} />
+                        }
+                      >
+                        <span>{game.title}</span>
+                      </SidebarMenuButton>
+                      <GameMenu
+                        gameId={game.id}
+                        title={game.title}
+                        trigger={<SidebarMenuAction showOnHover />}
+                      />
+                    </SidebarMenuItem>
+                  )
+                })}
               </SidebarMenu>
             )}
             <SidebarMenu className="hidden group-data-[collapsible=icon]:flex">
@@ -139,21 +143,35 @@ export function AppSidebar({
                       </Empty>
                     ) : (
                       <SidebarMenu>
-                        {games.map((game) => (
-                          <SidebarMenuItem key={game.id}>
-                            <PopoverClose
-                              nativeButton={false}
-                              render={
-                                <SidebarMenuButton
-                                  isActive={pathname === `/games/${game.id}`}
-                                  render={<Link href={`/games/${game.id}`} />}
-                                >
-                                  <span>{game.title}</span>
-                                </SidebarMenuButton>
-                              }
-                            />
-                          </SidebarMenuItem>
-                        ))}
+                        {games.map((game) => {
+                          const slug =
+                            game.slug || slugifyTitle(game.title) || game.id
+                          const isCurrent =
+                            pathname === `/games/${slug}` ||
+                            pathname === `/games/${game.id}` ||
+                            pathname === `/games/${slugifyTitle(game.title)}`
+
+                          return (
+                            <SidebarMenuItem key={game.id}>
+                              <PopoverClose
+                                nativeButton={false}
+                                render={
+                                  <SidebarMenuButton
+                                    isActive={isCurrent}
+                                    render={
+                                      <Link
+                                        href={`/games/${slug}`}
+                                        prefetch={true}
+                                      />
+                                    }
+                                  >
+                                    <span>{game.title}</span>
+                                  </SidebarMenuButton>
+                                }
+                              />
+                            </SidebarMenuItem>
+                          )
+                        })}
                       </SidebarMenu>
                     )}
                   </PopoverContent>

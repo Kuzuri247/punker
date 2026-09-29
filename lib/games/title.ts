@@ -15,3 +15,15 @@ export function truncateTitle(title: string) {
     ? `${title.slice(0, TITLE_MAX_LENGTH - 1).trimEnd()}…`
     : title
 }
+
+/** Converts a game title into a clean URL-friendly slug */
+export function slugifyTitle(title: string): string {
+  const slug = title
+    .toLowerCase()
+    .trim()
+    .replace(/['"]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+
+  return slug || "untitled-game"
+}

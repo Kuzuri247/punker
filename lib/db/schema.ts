@@ -19,6 +19,7 @@ export const games = pgTable(
     // Clerk organization id (`auth().orgId`), not a foreign key.
     orgId: text("org_id").notNull(),
     title: text("title").notNull(),
+    slug: text("slug"),
     // The game's chat thread, in the `useChat` UI message format. One game has
     // exactly one thread, so it is stored inline rather than in its own table.
     messages: jsonb("messages")
@@ -49,6 +50,7 @@ export const games = pgTable(
       table.orgId,
       table.createdAt.desc()
     ),
+    index("games_org_id_slug_idx").on(table.orgId, table.slug),
   ]
 )
 
@@ -90,7 +92,9 @@ export const subscriptions = pgTable("subscriptions", {
   currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
   sandboxMemoryMb: integer("sandbox_memory_mb").notNull().default(1024),
   sandboxVcpu: integer("sandbox_vcpu").notNull().default(1),
-  maxConcurrentSandboxes: integer("max_concurrent_sandboxes").notNull().default(1),
+  maxConcurrentSandboxes: integer("max_concurrent_sandboxes")
+    .notNull()
+    .default(1),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .default(sql`now()`),

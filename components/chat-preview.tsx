@@ -1,11 +1,11 @@
 "use client"
 
 import * as Sentry from "@sentry/nextjs"
-import { AlertTriangle, Download, Maximize2, Minimize2, Sparkles, X } from "lucide-react"
+import { AlertTriangle, Maximize2, Minimize2, Sparkles, X } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 
+import { SandboxStartupLoader } from "@/components/sandbox-loader"
 import { Button } from "@/components/ui/button"
-import { Spinner } from "@/components/ui/spinner"
 import { cn } from "@/lib/utils"
 
 type Preview =
@@ -155,6 +155,12 @@ export function ChatPreview({
 
         if (response.status === 409) {
           setPreview({ status: "building" })
+          // Auto-poll to smoothly connect as soon as the sandbox is spun up
+          setTimeout(() => {
+            if (!controller.signal.aborted) {
+              void load()
+            }
+          }, 2000)
           return
         }
 
@@ -276,47 +282,47 @@ export function ChatPreview({
 
   const [isExporting, setIsExporting] = useState(false)
 
-  async function handleExport() {
-    setIsExporting(true)
-    try {
-      const response = await fetch(`/api/games/${gameId}/download`)
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => null)
-        throw new Error(
-          errorData?.error || `Export failed: HTTP ${response.status}`
-        )
-      }
+  // async function handleExport() {
+  //   setIsExporting(true)
+  //   try {
+  //     const response = await fetch(`/api/games/${gameId}/download`)
+  //     if (!response.ok) {
+  //       const errorData = await response.json().catch(() => null)
+  //       throw new Error(
+  //         errorData?.error || `Export failed: HTTP ${response.status}`
+  //       )
+  //     }
 
-      const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
-      const filename = `game-${gameId.slice(0, 8)}-build.zip`
+  //     const blob = await response.blob()
+  //     const url = window.URL.createObjectURL(blob)
+  //     const filename = `game-${gameId.slice(0, 8)}-build.zip`
 
-      const anchor = document.createElement("a")
-      anchor.style.display = "none"
-      anchor.href = url
-      anchor.download = filename
-      document.body.appendChild(anchor)
-      anchor.click()
+  //     const anchor = document.createElement("a")
+  //     anchor.style.display = "none"
+  //     anchor.href = url
+  //     anchor.download = filename
+  //     document.body.appendChild(anchor)
+  //     anchor.click()
 
-      setTimeout(() => {
-        document.body.removeChild(anchor)
-        window.URL.revokeObjectURL(url)
-      }, 1000)
-    } catch (err: any) {
-      alert(err?.message || "Failed to download game export.")
-    } finally {
-      setIsExporting(false)
-    }
-  }
+  //     setTimeout(() => {
+  //       document.body.removeChild(anchor)
+  //       window.URL.revokeObjectURL(url)
+  //     }, 1000)
+  //   } catch (err: any) {
+  //     alert(err?.message || "Failed to download game export.")
+  //   } finally {
+  //     setIsExporting(false)
+  //   }
+  // }
 
   if (preview.status === "loading" || preview.status === "building") {
-    return <MinimalistCanvasLoader status={preview.status} />
+    return <SandboxStartupLoader status={preview.status} />
   }
 
   if (preview.status === "error") {
     return (
       <div className="flex h-full flex-col items-center justify-center p-6 text-center">
-        <p className="text-sm text-muted-foreground max-w-sm leading-relaxed">
+        <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
           {preview.message}
         </p>
       </div>
@@ -348,9 +354,11 @@ export function ChatPreview({
         <Button
           variant="outline"
           size="sm"
-          className="h-8 gap-1.5 rounded-lg border-border/80 bg-background/85 px-3 text-xs font-medium shadow-xs backdrop-blur-md hover:bg-background cursor-pointer transition-all active:scale-95"
+          className="h-8 cursor-pointer gap-1.5 rounded-lg border-border/80 bg-background/85 px-3 text-xs font-medium shadow-xs backdrop-blur-md transition-all hover:bg-background active:scale-95"
           onClick={toggleFullscreen}
-          title={isFullscreen ? "Exit full screen (Esc)" : "Switch to full screen"}
+          title={
+            isFullscreen ? "Exit full screen (Esc)" : "Switch to full screen"
+          }
         >
           {isFullscreen ? (
             <>
@@ -362,45 +370,31 @@ export function ChatPreview({
             </>
           )}
         </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-8 gap-1.5 rounded-lg border-border/80 bg-background/85 px-3 text-xs font-medium shadow-xs backdrop-blur-md hover:bg-background cursor-pointer transition-all active:scale-95"
-          onClick={handleExport}
-          disabled={isExporting}
-        >
-          {isExporting ? (
-            <Spinner className="size-3.5" />
-          ) : (
-            <Download className="size-3.5" />
-          )}
-          {isExporting ? "Exporting..." : ""}
-        </Button>
       </div>
 
       {runtimeError && (
-        <div className="absolute bottom-3 left-3 right-3 z-30 flex items-center justify-between gap-3 rounded-xl border border-destructive/40 bg-card/90 p-3 shadow-lg backdrop-blur-md animate-in fade-in slide-in-from-bottom-2 duration-200">
+        <div className="absolute right-3 bottom-3 left-3 z-30 flex animate-in items-center justify-between gap-3 rounded-xl border border-destructive/40 bg-card/90 p-3 shadow-lg backdrop-blur-md duration-200 fade-in slide-in-from-bottom-2">
           <div className="flex items-center gap-2.5 overflow-hidden">
             <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-destructive/15 text-destructive">
               <AlertTriangle className="size-4 animate-pulse" />
             </div>
-            <div className="flex flex-col min-w-0">
+            <div className="flex min-w-0 flex-col">
               <span className="text-xs font-semibold text-foreground">
                 Runtime Crash Detected
               </span>
-              <span className="truncate text-[11px] text-muted-foreground font-mono">
+              <span className="truncate font-mono text-[11px] text-muted-foreground">
                 {runtimeError.message}
                 {runtimeError.source &&
                   ` (${runtimeError.source.split("/").pop()}:${runtimeError.line || 1})`}
               </span>
             </div>
           </div>
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex shrink-0 items-center gap-1.5">
             {onSelfHeal && (
               <Button
                 size="sm"
                 variant="default"
-                className="h-7 gap-1.5 rounded-lg px-2.5 text-xs font-medium bg-foreground text-background hover:bg-foreground/90 transition-all active:scale-95 cursor-pointer"
+                className="h-7 cursor-pointer gap-1.5 rounded-lg bg-foreground px-2.5 text-xs font-medium text-background transition-all hover:bg-foreground/90 active:scale-95"
                 onClick={() => onSelfHeal(runtimeError)}
               >
                 <Sparkles className="size-3 text-amber-500" />
@@ -410,7 +404,7 @@ export function ChatPreview({
             <Button
               size="icon"
               variant="ghost"
-              className="size-7 rounded-lg text-muted-foreground hover:text-foreground cursor-pointer"
+              className="size-7 cursor-pointer rounded-lg text-muted-foreground hover:text-foreground"
               onClick={() => setRuntimeError(null)}
             >
               <X className="size-3.5" />
@@ -447,18 +441,18 @@ function MinimalistCanvasLoader({
       <div className="pointer-events-none absolute size-72 rounded-full bg-foreground/[0.025] blur-3xl" />
 
       {/* Central minimal loader */}
-      <div className="relative z-10 flex flex-col items-center gap-3.5 text-center animate-in fade-in duration-300">
+      <div className="relative z-10 flex animate-in flex-col items-center gap-3.5 text-center duration-300 fade-in">
         <div className="relative flex size-10 items-center justify-center rounded-xl border border-border/80 bg-card/90 shadow-2xs">
-          <Sparkles className="size-4 text-foreground/80 animate-pulse" />
+          <Sparkles className="size-4 animate-pulse text-foreground/80" />
         </div>
 
         <div className="flex flex-col items-center gap-1">
-          <span className="text-[14px] font-medium text-foreground tracking-tight">
+          <span className="text-[14px] font-medium tracking-tight text-foreground">
             {status === "building"
               ? "Building 3D Scene"
               : "Connecting Live Preview"}
           </span>
-          <span className="text-[12px] text-muted-foreground max-w-[280px] leading-relaxed">
+          <span className="max-w-[280px] text-[12px] leading-relaxed text-muted-foreground">
             {status === "building"
               ? "Punker Studio is preparing assets, camera, and game loop…"
               : "Loading sandbox environment…"}
@@ -468,4 +462,3 @@ function MinimalistCanvasLoader({
     </div>
   )
 }
-

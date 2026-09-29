@@ -183,7 +183,7 @@ export function SettingsMenu({
 
         <DropdownMenuGroup>
           <DropdownMenuItem
-            render={<Link href="/billing" />}
+            render={<Link href="/billing" prefetch={true} />}
             className="flex cursor-pointer items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-normal"
           >
             <Coins className="size-4.5 text-muted-foreground" />
