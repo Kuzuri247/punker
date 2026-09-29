@@ -1,12 +1,12 @@
 "use client"
 
-import { OrganizationSwitcher, UserButton } from "@clerk/nextjs"
-import { CoinsIcon, MessageSquareIcon, SquarePenIcon } from "lucide-react"
+import { OrganizationSwitcher } from "@clerk/nextjs"
+import { MessageSquareIcon, SquarePenIcon } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
-import { ThemeToggle } from "@/components/theme-toggle"
+import { SettingsMenu } from "@/components/settings-menu"
 import { GameMenu } from "@/components/game-menu"
 import { Empty, EmptyDescription } from "@/components/ui/empty"
 import {
@@ -27,12 +27,10 @@ import {
   SidebarHeader,
   SidebarMenu,
   SidebarMenuAction,
-  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarTrigger,
 } from "@/components/ui/sidebar"
-import { formatCredits } from "@/lib/billing/format"
 import type { GameSummary } from "@/lib/games/queries"
 
 export function AppSidebar({
@@ -166,20 +164,6 @@ export function AppSidebar({
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              isActive={pathname === "/billing"}
-              render={<Link href="/billing" />}
-            >
-              <CoinsIcon />
-              <span>Credits</span>
-            </SidebarMenuButton>
-            <SidebarMenuBadge className="rounded-md border border-border/60 bg-secondary/80 px-2 py-0.5 text-[11px] font-medium text-foreground/80">
-              {formatCredits(credits)}
-            </SidebarMenuBadge>
-          </SidebarMenuItem>
-        </SidebarMenu>
         <div className="flex items-center justify-between gap-2 px-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
           <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
             <OrganizationSwitcher
@@ -187,18 +171,18 @@ export function AppSidebar({
                 elements: {
                   rootBox: "w-full! max-w-full",
                   organizationSwitcherTrigger:
-                    "w-full! max-w-full justify-between!",
-                  organizationPreview: "min-w-0",
-                  organizationPreviewTextContainer: "min-w-0",
-                  organizationPreviewMainIdentifier: "truncate",
+                    "w-full! max-w-full justify-between! rounded-lg hover:bg-secondary/50 transition-colors py-1.5 px-2",
+                  organizationPreview: "min-w-0 flex items-center gap-2",
+                  organizationPreviewTextContainer: "min-w-0 flex-1 text-left",
+                  organizationPreviewMainIdentifier:
+                    "truncate font-medium text-sm text-foreground",
+                  organizationPreviewSecondaryIdentifier:
+                    "truncate text-xs text-muted-foreground",
                 },
               }}
             />
           </div>
-          <div className="flex items-center gap-1">
-            <ThemeToggle />
-            <UserButton />
-          </div>
+          <SettingsMenu credits={credits} />
         </div>
       </SidebarFooter>
     </Sidebar>

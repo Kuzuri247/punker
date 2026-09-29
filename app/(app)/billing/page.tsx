@@ -44,10 +44,10 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
     getEntitlements(targetId),
     targetId
       ? db
-          .select()
-          .from(subscriptions)
-          .where(eq(subscriptions.userId, targetId))
-          .limit(1)
+        .select()
+        .from(subscriptions)
+        .where(eq(subscriptions.userId, targetId))
+        .limit(1)
       : Promise.resolve([]),
   ])
 
@@ -58,24 +58,6 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
 
   return (
     <div className="flex min-h-svh flex-col">
-      <header className="flex h-12 shrink-0 items-center justify-between border-b px-6">
-        <span className="font-heading text-sm font-medium">Billing & Credits</span>
-        <div className="flex items-center gap-3">
-          {isPaidActive && (
-            <Link
-              href="/customer-portal"
-              target="_blank"
-              className={buttonVariants({ variant: "outline", size: "sm" })}
-            >
-              Manage Subscription
-              <ExternalLink className="ml-1.5 size-3.5" />
-            </Link>
-          )}
-          <span className="text-xs font-medium text-muted-foreground">
-            Balance: {formatCredits(credits)}
-          </span>
-        </div>
-      </header>
 
       <div className="mx-auto w-full max-w-6xl px-6 py-10">
         <div className="flex flex-col gap-10">
@@ -178,11 +160,10 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
             <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
               {/* Free Explorer */}
               <div
-                className={`relative flex flex-col justify-between rounded-2xl border p-5 transition-all ${
-                  currentTier === "free"
+                className={`relative flex flex-col justify-between rounded-2xl border p-5 transition-all ${currentTier === "free"
                     ? "border-primary/50 bg-card shadow-sm ring-1 ring-primary/20"
                     : "border-border/70 bg-card/40"
-                }`}
+                  }`}
               >
                 <div>
                   <div className="flex items-center justify-between">
@@ -247,11 +228,10 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
 
               {/* Indie Creator */}
               <div
-                className={`relative flex flex-col justify-between rounded-2xl border-2 p-5 transition-all ${
-                  currentTier === "pro"
+                className={`relative flex flex-col justify-between rounded-2xl border-2 p-5 transition-all ${currentTier === "pro"
                     ? "border-primary bg-card shadow-md"
                     : "border-foreground/80 bg-card/90 shadow-sm"
-                }`}
+                  }`}
               >
                 <div className="absolute -top-3 right-4">
                   <span className="rounded-full bg-foreground text-background px-2 py-0.5 text-[10px] font-medium shadow-xs">
@@ -324,11 +304,10 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
 
               {/* Studio Pro */}
               <div
-                className={`relative flex flex-col justify-between rounded-2xl border p-5 transition-all ${
-                  currentTier === "studio"
+                className={`relative flex flex-col justify-between rounded-2xl border p-5 transition-all ${currentTier === "studio"
                     ? "border-primary bg-card shadow-md ring-1 ring-primary/20"
                     : "border-border/70 bg-card/40"
-                }`}
+                  }`}
               >
                 <div>
                   <div className="flex items-center justify-between">
@@ -395,11 +374,10 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
 
               {/* BYOK Hacker */}
               <div
-                className={`relative flex flex-col justify-between rounded-2xl border p-5 transition-all ${
-                  currentTier === "byok"
+                className={`relative flex flex-col justify-between rounded-2xl border p-5 transition-all ${currentTier === "byok"
                     ? "border-primary bg-card shadow-md ring-1 ring-primary/20"
                     : "border-border/70 bg-card/40"
-                }`}
+                  }`}
               >
                 <div>
                   <div className="flex items-center justify-between">
