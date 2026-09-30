@@ -4,7 +4,7 @@ import type { ChatSessionPersistedState } from "@trigger.dev/sdk/chat"
 import type { UIMessage } from "ai"
 import { PanelRightClose, PanelRightOpen, Play } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { useCallback, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import type { PanelImperativeHandle } from "react-resizable-panels"
 
 import {
@@ -50,6 +50,31 @@ export function GameChat({
   const sendPromptRef = useRef<((text: string) => void) | null>(null)
 
   const router = useRouter()
+
+  // Session Re-attachment: Reconnect to active environments across page reloads
+  useEffect(() => {
+    try {
+      const stored = sessionStorage.getItem(`punker_active_sandbox_${gameId}`)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        // If the sandbox was active in the last 30 minutes, automatically re-attach
+        if (Date.now() - parsed.timestamp < 30 * 60 * 1000) {
+          setIsStarted(true)
+        }
+      }
+    } catch (_) {}
+  }, [gameId])
+
+  useEffect(() => {
+    if (isStarted) {
+      try {
+        sessionStorage.setItem(
+          `punker_active_sandbox_${gameId}`,
+          JSON.stringify({ timestamp: Date.now(), sandboxId })
+        )
+      } catch (_) {}
+    }
+  }, [isStarted, gameId, sandboxId])
 
   const handleStartSandbox = useCallback(() => {
     setIsStarted(true)
@@ -138,6 +163,11 @@ export function GameChat({
           <div className="flex h-8 items-center gap-1.5 rounded-lg border border-border/70 bg-background/90 px-3 text-xs text-muted-foreground shadow-sm backdrop-blur-md">
             <Spinner className="size-3.5" />
             <span className="hidden sm:inline animate-pulse">Starting Sandbox…</span>
+          </div>
+        ) : previewStatus === "fallback" ? (
+          <div className="flex h-8 items-center gap-1.5 rounded-lg border border-amber-500/25 bg-background/90 px-3 text-[11px] font-medium text-amber-500 shadow-sm backdrop-blur-md">
+            <span className="size-1.5 rounded-full bg-amber-500 animate-ping" />
+            <span>Standby Preview</span>
           </div>
         ) : (
           <div className="flex h-8 items-center gap-1.5 rounded-lg border border-emerald-500/25 bg-background/90 px-3 text-[11px] font-medium text-emerald-600 dark:text-emerald-400 shadow-sm backdrop-blur-md">

@@ -44,9 +44,15 @@ const BOOT_STEPS = [
 
 export function SandboxStartupLoader({
   status = "loading",
+  attempt = 0,
+  probeDelay = 500,
+  elapsedSeconds = 0,
   className,
 }: {
   status?: "loading" | "building"
+  attempt?: number
+  probeDelay?: number
+  elapsedSeconds?: number
   className?: string
 }) {
   const [currentStepIndex, setCurrentStepIndex] = React.useState(0)
@@ -220,6 +226,22 @@ export function SandboxStartupLoader({
               )
             })}
           </div>
+
+          {/* Realtime Probe Handshake Bar */}
+          <div className="mt-3 flex items-center justify-between border-t border-border/50 pt-2 font-mono text-[10px] text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <span className="size-1.5 rounded-full bg-cyan-400 animate-pulse" />
+              Probe #{attempt + 1} ({probeDelay}ms backoff)
+            </span>
+            <span>{elapsedSeconds}s elapsed</span>
+          </div>
+
+          {elapsedSeconds >= 15 && (
+            <div className="mt-1 flex items-center gap-1.5 text-[10px] text-amber-500 font-medium">
+              <span className="size-1.5 rounded-full bg-amber-500 animate-ping" />
+              Cold-start fallback engaged • Provisioning VM…
+            </div>
+          )}
         </div>
       </div>
     </div>

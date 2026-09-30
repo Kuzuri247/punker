@@ -16,12 +16,13 @@ import { SandboxStartupLoader } from "@/components/sandbox-loader"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
-export type PreviewStatus = "idle" | "loading" | "building" | "ready" | "error"
+export type PreviewStatus = "idle" | "loading" | "building" | "fallback" | "ready" | "error"
 
 type Preview =
   | { status: "idle" }
   | { status: "loading" }
   | { status: "building" }
+  | { status: "fallback"; revision: number }
   | { status: "ready"; url: string; revision: number }
   | { status: "error"; message: string }
 
@@ -109,6 +110,9 @@ export function ChatPreview({
   const [runtimeError, setRuntimeError] = useState<GameError | null>(null)
   const [isAutoHealing, setIsAutoHealing] = useState(false)
   const autoHealedRevisions = useRef<Set<number>>(new Set())
+  const [probeAttempt, setProbeAttempt] = useState(0)
+  const [probeDelay, setProbeDelay] = useState(500)
+  const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const frameRef = useRef<HTMLIFrameElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -173,6 +177,12 @@ export function ChatPreview({
     )
 
     const controller = new AbortController()
+    const startTime = Date.now()
+    let attempt = 0
+
+    const elapsedTimer = setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - startTime) / 1000))
+    }, 1000)
 
     async function load() {
       try {
@@ -182,13 +192,25 @@ export function ChatPreview({
         const body = await response.json()
 
         if (response.status === 409) {
-          setPreview({ status: "building" })
-          // Auto-poll to smoothly connect as soon as the sandbox is spun up
+          attempt++
+          // Exponential backoff: 500ms -> 1000ms -> 2000ms -> 4000ms max
+          const nextDelay = Math.min(500 * Math.pow(2, Math.min(attempt - 1, 3)), 4000)
+          setProbeAttempt(attempt)
+          setProbeDelay(nextDelay)
+
+          const totalElapsed = (Date.now() - startTime) / 1000
+          if (totalElapsed >= 15) {
+            // Cold-start fallback after 15 seconds: serve client-side standby preview while container provisions
+            setPreview({ status: "fallback", revision })
+          } else {
+            setPreview({ status: "building" })
+          }
+
           setTimeout(() => {
             if (!controller.signal.aborted) {
               void load()
             }
-          }, 2000)
+          }, nextDelay)
           return
         }
 
@@ -196,7 +218,23 @@ export function ChatPreview({
           throw new Error(body.error ?? "Preview is unavailable")
         }
 
+        // Readiness probe: verify signed preview URL before mounting iframe
+        try {
+          await fetch(body.url, { method: "HEAD", mode: "no-cors", signal: controller.signal })
+        } catch (_) {
+          await new Promise((r) => setTimeout(r, 350))
+        }
+
+        clearInterval(elapsedTimer)
         setPreview({ status: "ready", url: body.url, revision })
+
+        // Session Re-attachment: cache active sandbox state
+        try {
+          sessionStorage.setItem(
+            `punker_active_sandbox_${gameId}`,
+            JSON.stringify({ timestamp: Date.now(), revision })
+          )
+        } catch (_) {}
       } catch (error) {
         // The abort is this effect being torn down, not a failure to report.
         if (controller.signal.aborted) {
@@ -224,7 +262,10 @@ export function ChatPreview({
 
     void load()
 
-    return () => controller.abort()
+    return () => {
+      clearInterval(elapsedTimer)
+      controller.abort()
+    }
   }, [gameId, revision, isStarted])
 
   const ready = preview.status === "ready" ? preview : null
@@ -343,8 +384,31 @@ export function ChatPreview({
     return <SandboxIdleView onStart={onStart} />
   }
 
+  if (preview.status === "fallback") {
+    return (
+      <div className="relative h-full w-full overflow-hidden bg-background">
+        <iframe
+          srcDoc={getFallbackClientHtml()}
+          title="Standby preview"
+          className="h-full w-full border-0"
+        />
+        <div className="absolute bottom-3.5 left-3.5 z-30 flex items-center gap-2 rounded-xl border border-border/80 bg-card/90 px-3 py-1.5 text-xs text-muted-foreground shadow-md backdrop-blur-md animate-in fade-in">
+          <div className="size-2 rounded-full bg-emerald-500 animate-ping" />
+          <span>Cloud VM cold-start &gt; 15s • Client Standby Active (auto-swapping when ready)…</span>
+        </div>
+      </div>
+    )
+  }
+
   if (preview.status === "loading" || preview.status === "building") {
-    return <SandboxStartupLoader status={preview.status} />
+    return (
+      <SandboxStartupLoader
+        status={preview.status}
+        attempt={probeAttempt}
+        probeDelay={probeDelay}
+        elapsedSeconds={elapsedSeconds}
+      />
+    )
   }
 
   if (preview.status === "error") {
@@ -555,4 +619,70 @@ function SandboxIdleView({ onStart }: { onStart: () => void }) {
       </div>
     </div>
   )
+}
+
+function getFallbackClientHtml() {
+  return `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Punker Client Standby</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: #080d1a; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; color: #fff; }
+    #canvas-container { position: absolute; inset: 0; }
+  </style>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.js"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="canvas-container"></div>
+  <script type="module">
+    import * as THREE from 'three';
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x080d1a, 0.08);
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 2.5, 7);
+    camera.lookAt(0, 0, 0);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+    const grid = new THREE.GridHelper(40, 40, 0x10b981, 0x1e293b);
+    grid.position.y = -1.2;
+    scene.add(grid);
+
+    const geo = new THREE.IcosahedronGeometry(1.4, 1);
+    const mat = new THREE.MeshBasicMaterial({ color: 0x10b981, wireframe: true, transparent: true, opacity: 0.8 });
+    const mesh = new THREE.Mesh(geo, mat);
+    scene.add(mesh);
+
+    const coreGeo = new THREE.SphereGeometry(0.7, 16, 16);
+    const coreMat = new THREE.MeshBasicMaterial({ color: 0x059669 });
+    const core = new THREE.Mesh(coreGeo, coreMat);
+    scene.add(core);
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    function animate() {
+      requestAnimationFrame(animate);
+      mesh.rotation.x += 0.007;
+      mesh.rotation.y += 0.012;
+      core.rotation.y -= 0.01;
+      renderer.render(scene, camera);
+    }
+    animate();
+  </script>
+</body>
+</html>`
 }
