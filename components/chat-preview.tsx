@@ -1,14 +1,25 @@
 "use client"
 
 import * as Sentry from "@sentry/nextjs"
-import { AlertTriangle, Maximize2, Minimize2, Sparkles, X } from "lucide-react"
+import {
+  AlertTriangle,
+  Maximize2,
+  Minimize2,
+  Play,
+  RotateCw,
+  Sparkles,
+  X,
+} from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 
 import { SandboxStartupLoader } from "@/components/sandbox-loader"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
+export type PreviewStatus = "idle" | "loading" | "building" | "ready" | "error"
+
 type Preview =
+  | { status: "idle" }
   | { status: "loading" }
   | { status: "building" }
   | { status: "ready"; url: string; revision: number }
@@ -71,33 +82,40 @@ function withoutQuery(value: string) {
 /**
  * The running game, embedded from its sandbox.
  *
- * The url can't be resolved on the server with the rest of the page: fetching
- * it starts the sandbox's server, which takes seconds on a cold sandbox and
- * would hold the whole chat behind it. So the panel mounts first and asks for
- * the url itself.
- *
- * `revision` is bumped by whoever owns the thread every time a turn finishes,
- * and every value of it — including the first — is one load of the game. That
- * is the whole reload: the agent's edits land in the sandbox during the turn,
- * so the build to show is whatever is on disk when the turn ends.
- *
- * Mounted under a `key` of the game id, so switching games remounts this with
- * fresh state instead of showing the previous game while the new url loads.
+ * To avoid spin-up lag on every chat switch, the sandbox starts on-demand
+ * when the player initiates it. Once running, it can also be hidden without
+ * unmounting the iframe.
  */
 export function ChatPreview({
   gameId,
   revision,
+  isStarted,
+  onStart,
+  onStatusChange,
+  onToggleHide,
   onSelfHeal,
 }: {
   gameId: string
   revision: number
+  isStarted: boolean
+  onStart: () => void
+  onStatusChange?: (status: PreviewStatus) => void
+  onToggleHide?: () => void
   onSelfHeal?: (error: GameError) => void
 }) {
-  const [preview, setPreview] = useState<Preview>({ status: "loading" })
+  const [preview, setPreview] = useState<Preview>(() =>
+    isStarted ? { status: "loading" } : { status: "idle" }
+  )
   const [runtimeError, setRuntimeError] = useState<GameError | null>(null)
+  const [isAutoHealing, setIsAutoHealing] = useState(false)
+  const autoHealedRevisions = useRef<Set<number>>(new Set())
   const [isFullscreen, setIsFullscreen] = useState(false)
   const frameRef = useRef<HTMLIFrameElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    onStatusChange?.(preview.status)
+  }, [preview.status, onStatusChange])
 
   const toggleFullscreen = () => {
     if (!isFullscreen) {
@@ -141,9 +159,19 @@ export function ChatPreview({
 
   useEffect(() => {
     setRuntimeError(null)
+    setIsAutoHealing(false)
   }, [revision])
 
   useEffect(() => {
+    if (!isStarted) {
+      setPreview({ status: "idle" })
+      return
+    }
+
+    setPreview((prev) =>
+      prev.status === "ready" ? prev : { status: "loading" }
+    )
+
     const controller = new AbortController()
 
     async function load() {
@@ -178,27 +206,16 @@ export function ChatPreview({
         const message =
           error instanceof Error ? error.message : "Preview is unavailable"
 
-        // The player is about to see "Preview is unavailable" and nothing else
-        // — this is the only record of which of the several reasons it was.
-        // The route logs the two it answers deliberately (404, 409); what
-        // reaches here on top of those is a 500 or the fetch itself failing.
         Sentry.logger.error(
           Sentry.logger.fmt`Preview unavailable for game ${gameId}: ${message}`,
           {
             "game.id": gameId,
             "game.revision": revision,
             "exception.message": message,
-            // A failure on revision 0 is a preview that never loaded; a later
-            // one is a turn's build failing to reach a player who was watching
-            // the previous build a moment ago.
             "preview.first_load": revision === 0,
           }
         )
 
-        // A reload that fails leaves the game already on screen where it is.
-        // It is the previous turn's build rather than the latest one, but the
-        // panel has no retry of its own — trading a working preview for an
-        // error message would strand the player there until the next turn.
         setPreview((current) =>
           current.status === "ready" ? current : { status: "error", message }
         )
@@ -208,7 +225,7 @@ export function ChatPreview({
     void load()
 
     return () => controller.abort()
-  }, [gameId, revision])
+  }, [gameId, revision, isStarted])
 
   const ready = preview.status === "ready" ? preview : null
 
@@ -244,6 +261,13 @@ export function ChatPreview({
       reported = true
       clearInterval(timer)
       setRuntimeError(error)
+
+      // Automated Self-Correction: auto-dispatch repair prompt to trigger/chat.ts
+      if (onSelfHeal && !autoHealedRevisions.current.has(ready.revision)) {
+        autoHealedRevisions.current.add(ready.revision)
+        setIsAutoHealing(true)
+        onSelfHeal(error)
+      }
 
       // Attributes take strings, numbers and booleans, so the halves of a
       // report the frame couldn't fill in are left out rather than sent empty:
@@ -315,16 +339,37 @@ export function ChatPreview({
   //   }
   // }
 
+  if (preview.status === "idle") {
+    return <SandboxIdleView onStart={onStart} />
+  }
+
   if (preview.status === "loading" || preview.status === "building") {
     return <SandboxStartupLoader status={preview.status} />
   }
 
   if (preview.status === "error") {
     return (
-      <div className="flex h-full flex-col items-center justify-center p-6 text-center">
-        <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
-          {preview.message}
-        </p>
+      <div className="relative flex h-full flex-col items-center justify-center p-6 text-center bg-muted/10">
+        <div className="flex max-w-sm flex-col items-center gap-3.5 rounded-2xl border border-border/80 bg-card/90 p-6 shadow-md backdrop-blur-md">
+          <div className="flex size-10 items-center justify-center rounded-xl bg-destructive/10 text-destructive">
+            <AlertTriangle className="size-5" />
+          </div>
+          <div className="flex flex-col gap-1">
+            <h4 className="text-sm font-semibold text-foreground">Sandbox Unavailable</h4>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              {preview.message}
+            </p>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="mt-1 cursor-pointer gap-1.5 rounded-lg text-xs"
+            onClick={onStart}
+          >
+            <RotateCw className="size-3.5" />
+            <span>Retry Connection</span>
+          </Button>
+        </div>
       </div>
     )
   }
@@ -350,24 +395,38 @@ export function ChatPreview({
         className="h-full w-full border-0 bg-white"
         allow="accelerometer; camera; encrypted-media; display-capture; geolocation; gyroscope; microphone; midi; clipboard-read; clipboard-write; fullscreen"
       />
-      <div className="absolute top-3 right-3 z-20 flex items-center gap-2">
+      <div
+        className={cn(
+          "absolute z-20 flex items-center gap-1.5",
+          isFullscreen ? "top-3.5 right-3.5" : "bottom-3.5 right-3.5"
+        )}
+      >
         <Button
           variant="outline"
           size="sm"
-          className="h-8 cursor-pointer gap-1.5 rounded-lg border-border/80 bg-background/85 px-3 text-xs font-medium shadow-xs backdrop-blur-md transition-all hover:bg-background active:scale-95"
+          className="h-7.5 size-7.5 cursor-pointer rounded-lg border-border/80 bg-background/90 p-0 text-muted-foreground shadow-xs backdrop-blur-md transition-all hover:bg-background hover:text-foreground active:scale-95"
+          onClick={() => {
+            if (frameRef.current) {
+              frameRef.current.src = frameRef.current.src
+            }
+          }}
+          title="Reload preview"
+        >
+          <RotateCw className="size-3.5" />
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7.5 size-7.5 cursor-pointer rounded-lg border-border/80 bg-background/90 p-0 text-muted-foreground shadow-xs backdrop-blur-md transition-all hover:bg-background hover:text-foreground active:scale-95"
           onClick={toggleFullscreen}
           title={
             isFullscreen ? "Exit full screen (Esc)" : "Switch to full screen"
           }
         >
           {isFullscreen ? (
-            <>
-              <Minimize2 className="size-3.5" />
-            </>
+            <Minimize2 className="size-3.5" />
           ) : (
-            <>
-              <Maximize2 className="size-3.5" />
-            </>
+            <Maximize2 className="size-3.5" />
           )}
         </Button>
       </div>
@@ -390,22 +449,35 @@ export function ChatPreview({
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
-            {onSelfHeal && (
-              <Button
-                size="sm"
-                variant="default"
-                className="h-7 cursor-pointer gap-1.5 rounded-lg bg-foreground px-2.5 text-xs font-medium text-background transition-all hover:bg-foreground/90 active:scale-95"
-                onClick={() => onSelfHeal(runtimeError)}
-              >
-                <Sparkles className="size-3 text-amber-500" />
-                <span>Fix with AI</span>
-              </Button>
+            {isAutoHealing ? (
+              <div className="flex items-center gap-1.5 rounded-lg border border-amber-500/25 bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-600 dark:text-amber-400">
+                <Sparkles className="size-3 animate-spin text-amber-500" />
+                <span>Auto-repairing…</span>
+              </div>
+            ) : (
+              onSelfHeal && (
+                <Button
+                  size="sm"
+                  variant="default"
+                  className="h-7 cursor-pointer gap-1.5 rounded-lg bg-foreground px-2.5 text-xs font-medium text-background transition-all hover:bg-foreground/90 active:scale-95"
+                  onClick={() => {
+                    setIsAutoHealing(true)
+                    onSelfHeal(runtimeError)
+                  }}
+                >
+                  <Sparkles className="size-3 text-amber-500" />
+                  <span>Fix with AI</span>
+                </Button>
+              )
             )}
             <Button
               size="icon"
               variant="ghost"
               className="size-7 cursor-pointer rounded-lg text-muted-foreground hover:text-foreground"
-              onClick={() => setRuntimeError(null)}
+              onClick={() => {
+                setRuntimeError(null)
+                setIsAutoHealing(false)
+              }}
             >
               <X className="size-3.5" />
             </Button>
@@ -416,14 +488,10 @@ export function ChatPreview({
   )
 }
 
-function MinimalistCanvasLoader({
-  status,
-}: {
-  status: "loading" | "building"
-}) {
+function SandboxIdleView({ onStart }: { onStart: () => void }) {
   return (
-    <div className="relative flex h-full w-full flex-col items-center justify-center overflow-hidden bg-muted/20 p-6 select-none">
-      {/* Subtle perspective grid lines */}
+    <div className="relative flex h-full w-full flex-col items-center justify-center overflow-hidden bg-muted/15 p-6 select-none">
+      {/* Subtle perspective cyber grid lines */}
       <div
         className="pointer-events-none absolute inset-0 opacity-[0.04] dark:opacity-[0.07]"
         style={{
@@ -437,26 +505,52 @@ function MinimalistCanvasLoader({
         }}
       />
 
-      {/* Ambient soft neutral glow */}
-      <div className="pointer-events-none absolute size-72 rounded-full bg-foreground/[0.025] blur-3xl" />
+      {/* Ambient soft glow */}
+      <div className="pointer-events-none absolute size-96 rounded-full bg-emerald-500/[0.04] blur-3xl" />
 
-      {/* Central minimal loader */}
-      <div className="relative z-10 flex animate-in flex-col items-center gap-3.5 text-center duration-300 fade-in">
-        <div className="relative flex size-10 items-center justify-center rounded-xl border border-border/80 bg-card/90 shadow-2xs">
-          <Sparkles className="size-4 animate-pulse text-foreground/80" />
+      {/* Central interactive idle card */}
+      <div className="relative z-10 flex max-w-sm flex-col items-center gap-5 rounded-2xl border border-border/70 bg-card/85 p-8 text-center shadow-xl backdrop-blur-md transition-all duration-300 animate-in fade-in zoom-in-95">
+        {/* Status pill */}
+        <div className="flex items-center gap-2 rounded-full border border-border/80 bg-background/80 px-3 py-1 text-[11px] font-medium text-muted-foreground shadow-2xs">
+          <span className="size-2 rounded-full bg-amber-500/80 animate-pulse" />
+          <span>Sandbox on Standby</span>
         </div>
 
-        <div className="flex flex-col items-center gap-1">
-          <span className="text-[14px] font-medium tracking-tight text-foreground">
-            {status === "building"
-              ? "Building 3D Scene"
-              : "Connecting Live Preview"}
-          </span>
-          <span className="max-w-[280px] text-[12px] leading-relaxed text-muted-foreground">
-            {status === "building"
-              ? "Punker Studio is preparing assets, camera, and game loop…"
-              : "Loading sandbox environment…"}
-          </span>
+        {/* Center icon with glowing ring */}
+        <div className="relative flex size-14 items-center justify-center rounded-2xl border border-border/80 bg-gradient-to-b from-card to-muted/40 shadow-sm">
+          <div className="absolute -inset-1 rounded-2xl bg-emerald-500/10 blur-sm" />
+          <Play className="size-6 text-foreground/80 fill-foreground/15 ml-0.5" />
+        </div>
+
+        {/* Text */}
+        <div className="flex flex-col gap-1.5">
+          <h3 className="text-base font-semibold tracking-tight text-foreground">
+            Sandbox Ready to Launch
+          </h3>
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Launch your isolated Daytona sandbox environment to play and test your game in real-time.
+          </p>
+        </div>
+
+        {/* Action Button */}
+        <Button
+          size="default"
+          onClick={onStart}
+          className="group relative cursor-pointer overflow-hidden rounded-xl bg-foreground px-5 py-2 text-xs font-semibold text-background shadow-md transition-all hover:bg-foreground/90 active:scale-95"
+        >
+          <div className="flex items-center gap-2">
+            <Play className="size-3.5 fill-emerald-500 text-emerald-500 transition-transform group-hover:scale-110" />
+            <span>Start Sandbox</span>
+          </div>
+        </Button>
+
+        {/* Quick badges */}
+        <div className="flex flex-wrap items-center justify-center gap-1.5 pt-1 text-[10px] text-muted-foreground/80">
+          <span className="rounded-md bg-muted/60 px-2 py-0.5">Instant Chat</span>
+          <span>•</span>
+          <span className="rounded-md bg-muted/60 px-2 py-0.5">Vite HMR</span>
+          <span>•</span>
+          <span className="rounded-md bg-muted/60 px-2 py-0.5">Isolated Runtime</span>
         </div>
       </div>
     </div>

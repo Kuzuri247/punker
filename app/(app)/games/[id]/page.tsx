@@ -45,7 +45,9 @@ export default async function GamePage({
   return (
     <div className="relative flex h-svh flex-col">
       <GameChat
+        key={game.id}
         gameId={game.id}
+        gameTitle={game.title}
         credits={credits}
         initialMessages={game.messages}
         initialModelId={isGameModelId(model) ? model : DEFAULT_GAME_MODEL_ID}
