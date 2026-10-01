@@ -16,55 +16,69 @@ const startSession = chat.createStartSessionAction<typeof gameChat>("game-chat")
  * session-scoped token. Idempotent on (environment, chatId), so two tabs
  * converge on one session.
  */
+const inFlightSessions = new Map<string, Promise<any>>()
+
 export async function startGameChatSession(
   params: ChatStartSessionParams<typeof gameChat>
 ) {
-  const startedAt = performance.now()
-
-  const { orgId } = await authorizeGame(params.chatId, "startGameChatSession")
-
-  // Checked before the session exists rather than inside it: a session that
-  // cannot afford a turn should never be created, because creating one starts a
-  // run that sits there waiting for a message it will only refuse. The agent
-  // checks again on every turn after this — a thread outlives the balance that
-  // opened it.
-  if (!(await hasCreditsToBuild(orgId))) {
-    Sentry.logger.info(
-      Sentry.logger
-        .fmt`Refused a chat session for game ${params.chatId} — no credits`,
-      { "game.id": params.chatId, "organization.id": orgId }
-    )
-
-    throw new Error(OUT_OF_CREDITS)
+  const existing = inFlightSessions.get(params.chatId)
+  if (existing) {
+    return existing
   }
 
-  try {
-    const session = await startSession(params)
+  const sessionPromise = (async () => {
+    const startedAt = performance.now()
 
-    // The handover from the web app to the Trigger.dev worker. Logged on both
-    // sides — `trigger/chat.ts` records the turn this starts — so a thread that
-    // never streams can be placed on one side of the boundary or the other.
-    Sentry.logger.info(
-      Sentry.logger.fmt`Started chat session for game ${params.chatId}`,
-      { "game.id": params.chatId, duration_ms: elapsed(startedAt) }
-    )
+    const { orgId } = await authorizeGame(params.chatId, "startGameChatSession")
 
-    return session
-  } catch (error) {
-    // Idempotent on (environment, chatId), so this is not a second tab losing
-    // a race — it is the session genuinely failing to start, which leaves the
-    // player with a composer that does nothing.
-    Sentry.logger.error(
-      Sentry.logger.fmt`Could not start chat session for game ${params.chatId}`,
-      {
-        "game.id": params.chatId,
-        ...describeError(error),
-        duration_ms: elapsed(startedAt),
-      }
-    )
+    // Checked before the session exists rather than inside it: a session that
+    // cannot afford a turn should never be created, because creating one starts a
+    // run that sits there waiting for a message it will only refuse. The agent
+    // checks again on every turn after this — a thread outlives the balance that
+    // opened it.
+    if (!(await hasCreditsToBuild(orgId))) {
+      Sentry.logger.info(
+        Sentry.logger
+          .fmt`Refused a chat session for game ${params.chatId} — no credits`,
+        { "game.id": params.chatId, "organization.id": orgId }
+      )
 
-    throw error
-  }
+      throw new Error(OUT_OF_CREDITS)
+    }
+
+    try {
+      const session = await startSession(params)
+
+      // The handover from the web app to the Trigger.dev worker. Logged on both
+      // sides — `trigger/chat.ts` records the turn this starts — so a thread that
+      // never streams can be placed on one side of the boundary or the other.
+      Sentry.logger.info(
+        Sentry.logger.fmt`Started chat session for game ${params.chatId}`,
+        { "game.id": params.chatId, duration_ms: elapsed(startedAt) }
+      )
+
+      return session
+    } catch (error) {
+      // Idempotent on (environment, chatId), so this is not a second tab losing
+      // a race — it is the session genuinely failing to start, which leaves the
+      // player with a composer that does nothing.
+      Sentry.logger.error(
+        Sentry.logger.fmt`Could not start chat session for game ${params.chatId}`,
+        {
+          "game.id": params.chatId,
+          ...describeError(error),
+          duration_ms: elapsed(startedAt),
+        }
+      )
+
+      throw error
+    } finally {
+      inFlightSessions.delete(params.chatId)
+    }
+  })()
+
+  inFlightSessions.set(params.chatId, sessionPromise)
+  return sessionPromise
 }
 
 /**

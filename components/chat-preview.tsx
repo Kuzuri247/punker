@@ -393,7 +393,6 @@ export function ChatPreview({
           className="h-full w-full border-0"
         />
         <div className="absolute bottom-3.5 left-3.5 z-30 flex items-center gap-2 rounded-xl border border-border/80 bg-card/90 px-3 py-1.5 text-xs text-muted-foreground shadow-md backdrop-blur-md animate-in fade-in">
-          <div className="size-2 rounded-full bg-emerald-500 animate-ping" />
           <span>Cloud VM cold-start &gt; 15s • Client Standby Active (auto-swapping when ready)…</span>
         </div>
       </div>
@@ -554,68 +553,29 @@ export function ChatPreview({
 
 function SandboxIdleView({ onStart }: { onStart: () => void }) {
   return (
-    <div className="relative flex h-full w-full flex-col items-center justify-center overflow-hidden bg-muted/15 p-6 select-none">
-      {/* Subtle perspective cyber grid lines */}
-      <div
-        className="pointer-events-none absolute inset-0 opacity-[0.04] dark:opacity-[0.07]"
-        style={{
-          backgroundImage: `
-            linear-gradient(to right, currentColor 1px, transparent 1px),
-            linear-gradient(to bottom, currentColor 1px, transparent 1px)
-          `,
-          backgroundSize: "32px 32px",
-          transform: "perspective(600px) rotateX(48deg) translateY(-15%)",
-          transformOrigin: "center center",
-        }}
-      />
-
-      {/* Ambient soft glow */}
-      <div className="pointer-events-none absolute size-96 rounded-full bg-emerald-500/[0.04] blur-3xl" />
-
-      {/* Central interactive idle card */}
-      <div className="relative z-10 flex max-w-sm flex-col items-center gap-5 rounded-2xl border border-border/70 bg-card/85 p-8 text-center shadow-xl backdrop-blur-md transition-all duration-300 animate-in fade-in zoom-in-95">
-        {/* Status pill */}
-        <div className="flex items-center gap-2 rounded-full border border-border/80 bg-background/80 px-3 py-1 text-[11px] font-medium text-muted-foreground shadow-2xs">
-          <span className="size-2 rounded-full bg-amber-500/80 animate-pulse" />
-          <span>Sandbox on Standby</span>
+    <div className="relative flex h-full w-full flex-col items-center justify-center p-6 select-none bg-background">
+      <div className="flex max-w-xs flex-col items-center gap-4 text-center animate-in fade-in duration-300">
+        <div className="flex size-11 items-center justify-center rounded-2xl border border-border/80 bg-muted/30 text-foreground shadow-2xs">
+          <Play className="size-4.5 fill-current ml-0.5 text-foreground/80" />
         </div>
 
-        {/* Center icon with glowing ring */}
-        <div className="relative flex size-14 items-center justify-center rounded-2xl border border-border/80 bg-gradient-to-b from-card to-muted/40 shadow-sm">
-          <div className="absolute -inset-1 rounded-2xl bg-emerald-500/10 blur-sm" />
-          <Play className="size-6 text-foreground/80 fill-foreground/15 ml-0.5" />
-        </div>
-
-        {/* Text */}
-        <div className="flex flex-col gap-1.5">
-          <h3 className="text-base font-semibold tracking-tight text-foreground">
-            Sandbox Ready to Launch
+        <div className="flex flex-col gap-1">
+          <h3 className="text-sm font-semibold tracking-tight text-foreground">
+            Sandbox Standby
           </h3>
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            Launch your isolated Daytona sandbox environment to play and test your game in real-time.
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            Launch the isolated runtime environment to run and test your game in real-time.
           </p>
         </div>
 
-        {/* Action Button */}
         <Button
-          size="default"
+          size="sm"
           onClick={onStart}
-          className="group relative cursor-pointer overflow-hidden rounded-xl bg-foreground px-5 py-2 text-xs font-semibold text-background shadow-md transition-all hover:bg-foreground/90 active:scale-95"
+          className="h-8.5 cursor-pointer gap-2 rounded-lg bg-foreground px-4 text-xs font-medium text-background shadow-xs transition-all hover:bg-foreground/90 active:scale-95"
         >
-          <div className="flex items-center gap-2">
-            <Play className="size-3.5 fill-emerald-500 text-emerald-500 transition-transform group-hover:scale-110" />
-            <span>Start Sandbox</span>
-          </div>
+          <Play className="size-3.5 fill-current" />
+          <span>Start Sandbox</span>
         </Button>
-
-        {/* Quick badges */}
-        <div className="flex flex-wrap items-center justify-center gap-1.5 pt-1 text-[10px] text-muted-foreground/80">
-          <span className="rounded-md bg-muted/60 px-2 py-0.5">Instant Chat</span>
-          <span>•</span>
-          <span className="rounded-md bg-muted/60 px-2 py-0.5">Vite HMR</span>
-          <span>•</span>
-          <span className="rounded-md bg-muted/60 px-2 py-0.5">Isolated Runtime</span>
-        </div>
       </div>
     </div>
   )

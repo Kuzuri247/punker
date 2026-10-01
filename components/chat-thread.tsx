@@ -330,15 +330,41 @@ export function ChatThread({
     }
   }, [gameId, initialMessages, sendMessage, outOfCredits])
 
+  const lastSubmittedPromptRef = useRef<{ text: string; timestamp: number } | null>(null)
+
   function handleSubmit(value: string) {
-    sendMessage({ text: value })
+    const trimmed = value.trim()
+    if (!trimmed) return
+
+    const now = Date.now()
+    if (
+      lastSubmittedPromptRef.current &&
+      lastSubmittedPromptRef.current.text === trimmed &&
+      now - lastSubmittedPromptRef.current.timestamp < 1000
+    ) {
+      return
+    }
+
+    lastSubmittedPromptRef.current = { text: trimmed, timestamp: now }
+    sendMessage({ text: trimmed })
     setPrompt("")
   }
 
   useEffect(() => {
     if (sendPromptRef) {
       sendPromptRef.current = (text: string) => {
-        sendMessage({ text })
+        const trimmed = text.trim()
+        if (!trimmed) return
+        const now = Date.now()
+        if (
+          lastSubmittedPromptRef.current &&
+          lastSubmittedPromptRef.current.text === trimmed &&
+          now - lastSubmittedPromptRef.current.timestamp < 1500
+        ) {
+          return
+        }
+        lastSubmittedPromptRef.current = { text: trimmed, timestamp: now }
+        sendMessage({ text: trimmed })
       }
     }
     return () => {
@@ -383,8 +409,12 @@ export function ChatThread({
         <MessageScroller className="flex-1">
           <MessageScrollerViewport>
             <MessageScrollerContent className="mx-auto w-full max-w-3xl space-y-6 px-4 py-8 sm:px-6">
-              {messages.map((message) => (
-                <MessageScrollerItem key={message.id} messageId={message.id}>
+              {messages.map((message, idx) => (
+                <MessageScrollerItem
+                  key={message.id}
+                  messageId={message.id}
+                  scrollAnchor={idx === messages.length - 1}
+                >
                   <Message align={message.role === "user" ? "end" : "start"} className="gap-3.5">
                     {message.role === "assistant" && (
                       <div className="flex size-7 shrink-0 items-center justify-center rounded-full border border-border/70 bg-card/80 text-foreground/80 shadow-2xs self-start mt-0.5">
@@ -492,7 +522,11 @@ export function ChatThread({
       {(status === "submitted" || status === "streaming") && (
         <div className="mx-auto flex w-full max-w-3xl items-center gap-2 px-4 pb-2.5 text-xs text-muted-foreground sm:px-6">
           <SparklesIcon className="size-3.5 animate-pulse text-foreground/70" />
-          <span>Generating…</span>
+          <span>
+            {status === "submitted"
+              ? "Connecting to studio worker…"
+              : "Generating game changes…"}
+          </span>
         </div>
       )}
 

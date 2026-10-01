@@ -147,55 +147,46 @@ export function GameChat({
 
   return (
     <div className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden">
-      {/* Floating Top-Right Controls: Start Sandbox button & Bookmark hide/show tab */}
-      <div className="absolute top-3.5 right-0 z-30 flex items-center gap-2">
-        {/* Start Sandbox / Status Pill */}
-        {!isStarted || previewStatus === "idle" ? (
-          <Button
-            size="sm"
-            onClick={handleStartSandbox}
-            className="h-8 cursor-pointer gap-1.5 rounded-lg border border-border/70 bg-background/90 px-3 text-xs font-medium text-foreground shadow-sm backdrop-blur-md transition-all hover:bg-muted active:scale-95"
-          >
-            <Play className="size-3.5 fill-emerald-500 text-emerald-500" />
-            <span>Start Sandbox</span>
-          </Button>
-        ) : previewStatus === "loading" || previewStatus === "building" ? (
-          <div className="flex h-8 items-center gap-1.5 rounded-lg border border-border/70 bg-background/90 px-3 text-xs text-muted-foreground shadow-sm backdrop-blur-md">
-            <Spinner className="size-3.5" />
-            <span className="hidden sm:inline animate-pulse">Starting Sandbox…</span>
-          </div>
-        ) : previewStatus === "fallback" ? (
-          <div className="flex h-8 items-center gap-1.5 rounded-lg border border-amber-500/25 bg-background/90 px-3 text-[11px] font-medium text-amber-500 shadow-sm backdrop-blur-md">
-            <span className="size-1.5 rounded-full bg-amber-500 animate-ping" />
-            <span>Standby Preview</span>
-          </div>
-        ) : (
-          <div className="flex h-8 items-center gap-1.5 rounded-lg border border-emerald-500/25 bg-background/90 px-3 text-[11px] font-medium text-emerald-600 dark:text-emerald-400 shadow-sm backdrop-blur-md">
-            <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span>Live Preview</span>
-          </div>
-        )}
-
-        {/* Bookmark tab sticking flush to the end of the screen */}
-        <button
-          type="button"
-          onClick={handleToggleHide}
-          className="group flex h-8 items-center justify-center rounded-l-md border-y border-l border-r-0 border-border/80 bg-background/95 px-2.5 text-muted-foreground shadow-sm backdrop-blur-md transition-all hover:bg-muted hover:text-foreground active:scale-95 cursor-pointer"
-          title={isPreviewHidden ? "Show sandbox" : "Hide sandbox"}
-          aria-label={isPreviewHidden ? "Show sandbox" : "Hide sandbox"}
-        >
-          {isPreviewHidden ? (
-            <div className="flex items-center gap-1">
-              <PanelRightOpen className="size-4" />
-              {isStarted && (
-                <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              )}
+      {/* Floating Top-Right Controls when sandbox is hidden: Start Sandbox button & Bookmark open tab */}
+      {isPreviewHidden && (
+        <div className="absolute top-3.5 right-0 z-30 flex items-center gap-2">
+          {!isStarted || previewStatus === "idle" ? (
+            <Button
+              size="sm"
+              onClick={handleStartSandbox}
+              className="h-8 cursor-pointer gap-1.5 rounded-lg border border-border/70 bg-background/90 px-3 text-xs font-medium text-foreground shadow-sm backdrop-blur-md transition-all hover:bg-muted active:scale-95"
+            >
+              <Play className="size-3.5 fill-current" />
+              <span>Start Sandbox</span>
+            </Button>
+          ) : previewStatus === "loading" || previewStatus === "building" ? (
+            <div className="flex h-8 items-center gap-1.5 rounded-lg border border-border/70 bg-background/90 px-3 text-xs text-muted-foreground shadow-sm backdrop-blur-md">
+              <Spinner className="size-3.5" />
+              <span className="hidden sm:inline animate-pulse">Starting Sandbox…</span>
+            </div>
+          ) : previewStatus === "fallback" ? (
+            <div className="flex h-8 items-center gap-1.5 rounded-lg border border-amber-500/25 bg-background/90 px-3 text-[11px] font-medium text-amber-500 shadow-sm backdrop-blur-md">
+              <span className="size-1.5 rounded-full bg-amber-500 animate-ping" />
+              <span>Standby Preview</span>
             </div>
           ) : (
-            <PanelRightClose className="size-4" />
+            <div className="flex h-8 items-center rounded-lg border border-border/70 bg-background/90 px-3 text-xs font-medium text-foreground shadow-sm backdrop-blur-md">
+              <span>Live Preview</span>
+            </div>
           )}
-        </button>
-      </div>
+
+          {/* Bookmark tab sticking flush to the end of the screen when sandbox is hidden */}
+          <button
+            type="button"
+            onClick={handleToggleHide}
+            className="group flex h-8 items-center justify-center rounded-l-md border-y border-l border-r-0 border-border/80 bg-background/95 px-2.5 text-muted-foreground shadow-sm backdrop-blur-md transition-all hover:bg-muted hover:text-foreground active:scale-95 cursor-pointer"
+            title="Show sandbox"
+            aria-label="Show sandbox"
+          >
+            <PanelRightOpen className="size-4" />
+          </button>
+        </div>
+      )}
 
       {/* Panels Group - Clean chat and preview layout taking full height */}
       <div className="min-h-0 flex-1">
@@ -218,8 +209,20 @@ export function GameChat({
             defaultSize={60}
             minSize="25"
             onResize={handleResize}
-            className="flex h-full flex-col"
+            className="relative flex h-full flex-col overflow-visible"
           >
+            {/* Extended sidebar button attached to the sandbox div edge */}
+            {!isPreviewHidden && (
+              <button
+                type="button"
+                onClick={handleToggleHide}
+                className="absolute top-3.5 -left-8 z-30 flex h-8 w-8 items-center justify-center rounded-l-md border-y border-l border-r-0 border-border/80 bg-background/95 text-muted-foreground shadow-sm backdrop-blur-md transition-all hover:bg-muted hover:text-foreground active:scale-95 cursor-pointer"
+                title="Hide sandbox"
+                aria-label="Hide sandbox"
+              >
+                <PanelRightClose className="size-4" />
+              </button>
+            )}
             <ChatPreview
               key={gameId}
               gameId={gameId}

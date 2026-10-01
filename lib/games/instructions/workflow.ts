@@ -79,12 +79,8 @@ disk. Every path is relative to the game directory ("index.html",
 - read_file — a file's current contents. Read before you edit: the game is
   whatever earlier turns left on disk, and editing from memory of what you
   wrote is how working code gets clobbered.
-- write_file — create a file, or replace one whole. Pass the entire file, not
-  a fragment; parent directories are made for you.
-- replace_text — change part of a file. Prefer it over rewriting: copy the
-  snippet exactly as read_file returned it, indentation included, and include
-  enough surrounding lines to make it the only match. Use replace_all for a
-  rename that runs through the file.
+- write_file — create a new file or completely rewrite a small file (<50 lines). Missing parent directories are made for you.
+- replace_text — surgical in-place modification. MANDATORY FOR EXISTING FILES: Always prefer replace_text over write_file when altering or fixing existing code. Full-file rewrites are wasteful, slow down generation latency, and cause regressions. Copy the snippet exactly as read_file returned it, indentation included, and include enough surrounding lines to make it uniquely identifiable. Use replace_all for consistent multi-site renames.
 - delete_file — remove a file the game no longer uses. Never index.html, which
   is what loads in the preview, and never anything under engine/, which every
   later turn expects to still be there.

@@ -47,6 +47,44 @@ export const gameChat = chat.agent({
   id: "game-chat",
   clientDataSchema: gameClientDataSchema,
   storage: gameTranscriptStorage,
+  cacheControl: { type: "ephemeral" },
+  prepareMessages: async ({ messages }) => {
+    if (messages.length === 0) return messages
+    const last = messages[messages.length - 1]
+    return [
+      ...messages.slice(0, -1),
+      {
+        ...last,
+        providerOptions: {
+          ...last.providerOptions,
+          anthropic: { cacheControl: { type: "ephemeral" } },
+        },
+      },
+    ]
+  },
+  pendingMessages: {
+    shouldInject: ({ steps }) => steps.length > 0,
+    onReceived: ({ message }) => {
+      logger.info(logger.fmt`Mid-turn steering message received for game`, {
+        "message.id": message.id,
+      })
+    },
+  },
+  uiMessageStreamOptions: {
+    sendReasoning: true,
+    sendSources: true,
+    onError: (error) => {
+      logger.error(logger.fmt`Chat turn stream error`, {
+        ...describeError(error),
+      })
+      if (error instanceof Error && error.message.includes("rate limit")) {
+        return "Model rate limit reached — waiting a moment to resume."
+      }
+      return error instanceof Error
+        ? error.message
+        : "An unexpected error occurred during generation."
+    },
+  },
   // Fires once per game, on the first message of its thread — so the sandbox
   // is created exactly once and is already seeded before `run` streams a reply.
   onChatStart: async ({ chatId }) => {
@@ -68,7 +106,12 @@ export const gameChat = chat.agent({
   },
   // Every turn, and the last point before it starts streaming: check credits.
   // The runtime TranscriptStorage has already persisted incoming messages at turn-start.
-  onTurnStart: async ({ chatId }) => {
+  onTurnStart: async ({ chatId, turn, runId }) => {
+    logger.info(logger.fmt`Chat turn starting for game ${chatId} (turn #${turn})`, {
+      "game.id": chatId,
+      "run.id": runId,
+      turn,
+    })
 
     // Checked on every turn, including the first turn of a continuation run —
     // which is where `onChatStart` would have missed it. The session-start
