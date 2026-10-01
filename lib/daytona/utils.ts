@@ -351,10 +351,45 @@ async function serverResponds(sandbox: Sandbox, retries = 0): Promise<boolean> {
   return exitCode === 0
 }
 
+const previewUrlCache = new Map<string, { url: string; expiresAt: number }>()
+
+/**
+ * Gets a cached signed preview URL for the sandbox, or generates a fresh one.
+ * The static game server is ensured to be up and running.
+ */
+export async function getGamePreviewUrl(
+  sandboxId: string,
+  ttlSeconds = PREVIEW_URL_TTL_SECONDS
+): Promise<{ url: string; sandbox: Sandbox }> {
+  const cached = previewUrlCache.get(sandboxId)
+  if (cached && cached.expiresAt > Date.now() + 5 * 60 * 1000) {
+    const { sandbox } = await startGameServer(sandboxId)
+    return { url: cached.url, sandbox }
+  }
+
+  const { sandbox } = await startGameServer(sandboxId)
+  const { url } = await sandbox.getSignedPreviewUrl(PREVIEW_PORT, ttlSeconds)
+
+  previewUrlCache.set(sandboxId, {
+    url,
+    expiresAt: Date.now() + ttlSeconds * 1000,
+  })
+
+  return { url, sandbox }
+}
+
+/**
+ * Invalidates the cached signed preview URL when a sandbox is paused, stopped, or recreated.
+ */
+export function invalidatePreviewUrlCache(sandboxId: string) {
+  previewUrlCache.delete(sandboxId)
+}
+
 /**
  * Manually pauses a running sandbox to eliminate idle compute fees.
  */
 export async function pauseGameSandbox(sandboxId: string): Promise<void> {
+  invalidatePreviewUrlCache(sandboxId)
   try {
     const sandbox = await daytona.get(sandboxId)
     if (sandbox.state === "started") {
@@ -373,6 +408,7 @@ export async function pauseGameSandbox(sandboxId: string): Promise<void> {
  * Archives a game's sandbox to cold disk storage when inactive for prolonged periods.
  */
 export async function archiveGameSandbox(sandboxId: string): Promise<void> {
+  invalidatePreviewUrlCache(sandboxId)
   try {
     const sandbox = await daytona.get(sandboxId)
     if (sandbox.state !== "destroyed") {

@@ -31,7 +31,7 @@ export function ThoughtAccordion({
   return (
     <div
       className={cn(
-        "my-2 w-full rounded-xl border border-border/70 bg-card/50 text-xs shadow-2xs backdrop-blur-xs transition-all overflow-hidden",
+        "mb-2 w-full rounded-xl border border-border/70 bg-card/50 text-xs shadow-2xs backdrop-blur-xs transition-all overflow-hidden",
         className
       )}
     >

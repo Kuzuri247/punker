@@ -5,7 +5,10 @@ import type { UIMessage } from "ai"
 import { PanelRightClose, PanelRightOpen, Play } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useRef, useState } from "react"
-import type { PanelImperativeHandle } from "react-resizable-panels"
+import type {
+  GroupImperativeHandle,
+  PanelImperativeHandle,
+} from "react-resizable-panels"
 
 import {
   ChatPreview,
@@ -25,6 +28,8 @@ import { cn } from "@/lib/utils"
 
 export function GameChat({
   gameId,
+  gameTitle,
+  gameSlug,
   credits,
   initialMessages,
   initialModelId,
@@ -33,6 +38,7 @@ export function GameChat({
 }: {
   gameId: string
   gameTitle?: string
+  gameSlug?: string
   /** The organization's balance when the page was rendered. */
   credits: bigint
   initialMessages: UIMessage[]
@@ -46,6 +52,8 @@ export function GameChat({
   const [isStarted, setIsStarted] = useState(false)
   const [previewStatus, setPreviewStatus] = useState<PreviewStatus>("idle")
   const [isPreviewHidden, setIsPreviewHidden] = useState(false)
+  const groupRef = useRef<GroupImperativeHandle>(null)
+  const chatPanelRef = useRef<PanelImperativeHandle>(null)
   const previewPanelRef = useRef<PanelImperativeHandle>(null)
   const sendPromptRef = useRef<((text: string) => void) | null>(null)
 
@@ -82,10 +90,10 @@ export function GameChat({
       const panel = previewPanelRef.current
       if (panel) {
         panel.expand()
-        if (panel.isCollapsed()) {
-          panel.resize(60)
-        }
+        panel.resize("50%")
       }
+      chatPanelRef.current?.resize("50%")
+      groupRef.current?.setLayout({ "chat-panel": 50, "preview-panel": 50 })
       setIsPreviewHidden(false)
     }
   }, [isPreviewHidden])
@@ -95,18 +103,20 @@ export function GameChat({
     if (!panel) return
     if (isPreviewHidden || panel.isCollapsed()) {
       panel.expand()
-      if (panel.isCollapsed()) {
-        panel.resize(60)
-      }
+      panel.resize("50%")
+      chatPanelRef.current?.resize("50%")
+      groupRef.current?.setLayout({ "chat-panel": 50, "preview-panel": 50 })
       setIsPreviewHidden(false)
     } else {
       panel.collapse()
+      chatPanelRef.current?.resize("100%")
+      groupRef.current?.setLayout({ "chat-panel": 100, "preview-panel": 0 })
       setIsPreviewHidden(true)
     }
   }, [isPreviewHidden])
 
   const handleResize = useCallback((size: { asPercentage: number }) => {
-    setIsPreviewHidden(size.asPercentage === 0)
+    setIsPreviewHidden(Math.round(size.asPercentage) === 0)
   }, [])
 
   const handleTurnComplete = useCallback(() => {
@@ -190,24 +200,31 @@ export function GameChat({
 
       {/* Panels Group - Clean chat and preview layout taking full height */}
       <div className="min-h-0 flex-1">
-        <ResizablePanelGroup>
+        <ResizablePanelGroup
+          groupRef={groupRef}
+          defaultLayout={{ "chat-panel": 50, "preview-panel": 50 }}
+        >
           <ResizablePanel
-            defaultSize="40"
-            minSize="25"
+            id="chat-panel"
+            panelRef={chatPanelRef}
+            defaultSize="50%"
+            minSize="20%"
             className="flex h-full flex-col"
           >
             {thread}
           </ResizablePanel>
           <ResizableHandle
             withHandle
+            disabled={isPreviewHidden}
             className={cn(isPreviewHidden && "hidden")}
           />
           <ResizablePanel
+            id="preview-panel"
             panelRef={previewPanelRef}
             collapsible={true}
-            collapsedSize={0}
-            defaultSize={60}
-            minSize="25"
+            collapsedSize="0%"
+            defaultSize="50%"
+            minSize="20%"
             onResize={handleResize}
             className="relative flex h-full flex-col overflow-visible"
           >
@@ -226,6 +243,8 @@ export function GameChat({
             <ChatPreview
               key={gameId}
               gameId={gameId}
+              gameTitle={gameTitle}
+              gameSlug={gameSlug}
               revision={previewRevision}
               isStarted={isStarted}
               onStart={handleStartSandbox}

@@ -35,7 +35,7 @@ import { Field, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
 import { deleteGame, renameGame } from "@/lib/games/actions"
-import { TITLE_MAX_LENGTH } from "@/lib/games/title"
+import { slugifyTitle, TITLE_MAX_LENGTH } from "@/lib/games/title"
 
 /**
  * What can be done to a game: rename it, or throw it away.
@@ -112,9 +112,12 @@ export function GameMenu({
         // header and on every row of the sidebar, so the same click means "leave
         // this page" in one place and "the list is one shorter" in the other.
         //
-        // Nothing closes the dialog on success. Either the page is being left,
-        // or the row this menu belongs to is about to stop being rendered.
-        await deleteGame(gameId, pathname === `/games/${gameId}`)
+        const isCurrentPage =
+          pathname === `/games/${gameId}` ||
+          pathname === `/games/${slugifyTitle(title)}` ||
+          (pathname.startsWith("/games/") &&
+            pathname.includes(slugifyTitle(title)))
+        await deleteGame(gameId, isCurrentPage)
       } catch {
         setError("This game could not be deleted. Try again.")
       }

@@ -6,6 +6,7 @@ import { getCreditBalance } from "@/lib/billing/ledger"
 import { GameChat } from "@/components/game-chat"
 import { DEFAULT_GAME_MODEL_ID, isGameModelId } from "@/lib/games/model-catalog"
 import { getGame } from "@/lib/games/queries"
+import { slugifyTitle } from "@/lib/games/title"
 
 export async function generateMetadata({
   params,
@@ -42,12 +43,20 @@ export default async function GamePage({
     notFound()
   }
 
+  // Canonicalize URL to human-friendly title slug instead of UUID
+  const slug = game.slug || slugifyTitle(game.title)
+  if (slug && id !== slug) {
+    const search = model ? `?model=${model}` : ""
+    redirect(`/games/${slug}${search}`)
+  }
+
   return (
     <div className="relative flex h-svh flex-col">
       <GameChat
         key={game.id}
         gameId={game.id}
         gameTitle={game.title}
+        gameSlug={slug}
         credits={credits}
         initialMessages={game.messages}
         initialModelId={isGameModelId(model) ? model : DEFAULT_GAME_MODEL_ID}

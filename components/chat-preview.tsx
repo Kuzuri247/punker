@@ -3,6 +3,7 @@
 import * as Sentry from "@sentry/nextjs"
 import {
   AlertTriangle,
+  ExternalLink,
   Maximize2,
   Minimize2,
   Play,
@@ -89,6 +90,8 @@ function withoutQuery(value: string) {
  */
 export function ChatPreview({
   gameId,
+  gameTitle,
+  gameSlug,
   revision,
   isStarted,
   onStart,
@@ -97,6 +100,8 @@ export function ChatPreview({
   onSelfHeal,
 }: {
   gameId: string
+  gameTitle?: string
+  gameSlug?: string
   revision: number
   isStarted: boolean
   onStart: () => void
@@ -186,7 +191,8 @@ export function ChatPreview({
 
     async function load() {
       try {
-        const response = await fetch(`/api/games/${gameId}/preview`, {
+        const identifier = gameSlug || gameId
+        const response = await fetch(`/api/games/${identifier}/preview`, {
           signal: controller.signal,
         })
         const body = await response.json()
@@ -218,9 +224,9 @@ export function ChatPreview({
           throw new Error(body.error ?? "Preview is unavailable")
         }
 
-        // Readiness probe: verify signed preview URL before mounting iframe
+        // Readiness probe: verify preview URL before mounting iframe
         try {
-          await fetch(body.url, { method: "HEAD", mode: "no-cors", signal: controller.signal })
+          await fetch(body.url, { method: "HEAD", signal: controller.signal })
         } catch (_) {
           await new Promise((r) => setTimeout(r, 350))
         }
@@ -266,7 +272,7 @@ export function ChatPreview({
       clearInterval(elapsedTimer)
       controller.abort()
     }
-  }, [gameId, revision, isStarted])
+  }, [gameId, gameSlug, revision, isStarted])
 
   const ready = preview.status === "ready" ? preview : null
 
@@ -464,6 +470,19 @@ export function ChatPreview({
           isFullscreen ? "top-3.5 right-3.5" : "bottom-3.5 right-3.5"
         )}
       >
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7.5 size-7.5 cursor-pointer rounded-lg border-border/80 bg-background/90 p-0 text-muted-foreground shadow-xs backdrop-blur-md transition-all hover:bg-background hover:text-foreground active:scale-95"
+          onClick={() => {
+            if (ready?.url) {
+              window.open(ready.url, "_blank", "noopener,noreferrer")
+            }
+          }}
+          title="Open preview in new window"
+        >
+          <ExternalLink className="size-3.5" />
+        </Button>
         <Button
           variant="outline"
           size="sm"

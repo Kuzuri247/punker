@@ -1,11 +1,8 @@
 import * as Sentry from "@sentry/nextjs"
 
-import {
-  PREVIEW_PORT,
-  PREVIEW_URL_TTL_SECONDS,
-  startGameServer,
-} from "@/lib/daytona/utils"
+import { getGamePreviewUrl } from "@/lib/daytona/utils"
 import { getGame } from "@/lib/games/queries"
+import { slugifyTitle } from "@/lib/games/title"
 import { elapsed } from "@/lib/observability"
 
 /**
@@ -71,11 +68,7 @@ export async function GET(
   // A throw from here is a 500, which `onRequestError` in `@/instrumentation`
   // already captures with a stack trace — and `startGameServer` logs the reason
   // the start failed on its way past. Nothing to add around it here.
-  const { sandbox } = await startGameServer(game.sandboxId)
-  const { url } = await sandbox.getSignedPreviewUrl(
-    PREVIEW_PORT,
-    PREVIEW_URL_TTL_SECONDS
-  )
+  const { url } = await getGamePreviewUrl(game.sandboxId)
 
   // The url is signed and the signature rides in the query, so it is a
   // credential — the sandbox id identifies the same thing without being one.
@@ -86,5 +79,13 @@ export async function GET(
     duration_ms: elapsed(startedAt),
   })
 
-  return Response.json({ url })
+  // Returns internal proxy URL as the primary iframe src using the human-readable
+  // title slug, sending X-Daytona-Skip-Preview-Warning to bypass Daytona's interstitial warning page.
+  const slug = game.slug || slugifyTitle(game.title) || id
+  const proxyUrl = `/api/games/${slug}/preview/proxy/`
+
+  return Response.json({
+    url: proxyUrl,
+    signedUrl: url,
+  })
 }

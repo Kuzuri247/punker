@@ -408,31 +408,40 @@ export function ChatThread({
         <MessageScrollerProvider>
         <MessageScroller className="flex-1">
           <MessageScrollerViewport>
-            <MessageScrollerContent className="mx-auto w-full max-w-3xl space-y-6 px-4 py-8 sm:px-6">
-              {messages.map((message, idx) => (
-                <MessageScrollerItem
-                  key={message.id}
-                  messageId={message.id}
-                  scrollAnchor={idx === messages.length - 1}
-                >
-                  <Message align={message.role === "user" ? "end" : "start"} className="gap-3.5">
-                    {message.role === "assistant" && (
-                      <div className="flex size-7 shrink-0 items-center justify-center rounded-full border border-border/70 bg-card/80 text-foreground/80 shadow-2xs self-start mt-0.5">
-                        <SparklesIcon className="size-3.5" />
-                      </div>
+            <MessageScrollerContent className="mx-auto w-full max-w-3xl gap-0 space-y-0 px-4 py-8 sm:px-6">
+              {messages.map((message, idx) => {
+                const isUser = message.role === "user"
+                const isFirst = idx === 0
+                const prevMessage = idx > 0 ? messages[idx - 1] : null
+                const isNewSection = isUser && !isFirst
+
+                return (
+                  <MessageScrollerItem
+                    key={message.id}
+                    messageId={message.id}
+                    scrollAnchor={idx === messages.length - 1}
+                    className={cn(
+                      // Prominent gap separating individual prompt and response sections
+                      isNewSection && "mt-10 sm:mt-12",
+                      // Snug gap between a prompt and its assistant response
+                      !isUser && prevMessage?.role === "user" && "mt-2.5 sm:mt-3",
+                      // Tight gap between consecutive assistant parts
+                      !isUser && prevMessage?.role === "assistant" && "mt-1.5"
                     )}
-                    <MessageContent>
-                      <Bubble
-                        variant={
-                          message.role === "user" ? "secondary" : "ghost"
-                        }
-                        align={message.role === "user" ? "end" : "start"}
-                        className={cn(
-                          message.role === "user" &&
-                            "rounded-2xl border border-border/60 bg-secondary/80 px-4 py-2.5 text-[15px] font-normal leading-relaxed text-foreground shadow-2xs"
-                        )}
-                      >
-                        <BubbleContent className="flex flex-col items-start gap-2">
+                  >
+                    <Message align={isUser ? "end" : "start"} className="gap-0">
+                      <MessageContent>
+                        <Bubble
+                          variant={
+                            isUser ? "secondary" : "ghost"
+                          }
+                          align={isUser ? "end" : "start"}
+                          className={cn(
+                            isUser &&
+                              "rounded-2xl border border-border/60 bg-secondary/80 px-4 py-2.5 text-[15px] font-normal leading-relaxed text-foreground shadow-2xs"
+                          )}
+                        >
+                          <BubbleContent className="flex w-full flex-col items-start gap-1">
                           {groupMessageParts(message.parts).map((group) => {
                             if (group.type === "reasoning") {
                               return (
@@ -511,7 +520,8 @@ export function ChatThread({
                     </MessageContent>
                   </Message>
                 </MessageScrollerItem>
-              ))}
+              )
+            })}
             </MessageScrollerContent>
           </MessageScrollerViewport>
           <MessageScrollerButton />
