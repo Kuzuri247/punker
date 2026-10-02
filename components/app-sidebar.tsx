@@ -67,8 +67,8 @@ export function AppSidebar({
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton
-                isActive={pathname === "/"}
-                render={<Link href="/" prefetch={true} />}
+                isActive={pathname === "/new"}
+                render={<Link href="/new" prefetch={true} />}
               >
                 <SquarePenIcon />
                 <span>New game</span>
