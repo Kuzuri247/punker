@@ -1,22 +1,40 @@
 import fs from "node:fs/promises"
 import path from "node:path"
-import * as esbuild from "esbuild"
 
 let cachedEngineMinJs: Uint8Array | null = null
 let cachedThreeModule: Uint8Array | null = null
 
 /**
- * Bundles all proprietary engine runtime modules:
- * engine.js, physics.js, sound.js, lighting.js, postfx.js,
- * particles.js, hud.js, controls.js, input.js, animation.js,
- * materials.js, math.js, models.js, state.js, debug.js
- * into a single self-contained punker-engine.min.js ES module.
+ * Retrieves the bundled proprietary engine runtime module (punker-engine.min.js),
+ * which consolidates engine.js, physics.js, sound.js, lighting.js, postfx.js,
+ * particles.js, hud.js, controls.js, input.js, animation.js, materials.js,
+ * math.js, models.js, state.js, and debug.js into a single standalone ES module.
  */
 export async function getBundledEngineScript(): Promise<Uint8Array> {
   if (cachedEngineMinJs) {
     return cachedEngineMinJs
   }
 
+  const bundledPath = path.join(
+    process.cwd(),
+    "lib",
+    "games",
+    "runtime",
+    "punker-engine.min.js"
+  )
+
+  try {
+    const content = await fs.readFile(bundledPath)
+    cachedEngineMinJs = new Uint8Array(content)
+    return cachedEngineMinJs
+  } catch (error) {
+    console.warn(
+      "Pre-bundled punker-engine.min.js not found on disk, reading index.js fallback:",
+      error instanceof Error ? error.message : String(error)
+    )
+  }
+
+  // Resilient fallback: read index.js directly if bundle file is missing
   const engineIndexPath = path.join(
     process.cwd(),
     "lib",
@@ -25,28 +43,9 @@ export async function getBundledEngineScript(): Promise<Uint8Array> {
     "engine",
     "index.js"
   )
-
-  try {
-    const buildResult = await esbuild.build({
-      entryPoints: [engineIndexPath],
-      bundle: true,
-      external: ["three", "three/*"],
-      format: "esm",
-      minify: true,
-      write: false,
-    })
-
-    if (buildResult.outputFiles && buildResult.outputFiles.length > 0) {
-      cachedEngineMinJs = buildResult.outputFiles[0].contents
-      return cachedEngineMinJs
-    }
-  } catch (error) {
-    console.error("Failed to bundle engine runtime with esbuild:", error)
-  }
-
-  // Resilient fallback: read index.js directly if esbuild fails
   const fallback = await fs.readFile(engineIndexPath)
-  return new Uint8Array(fallback)
+  cachedEngineMinJs = new Uint8Array(fallback)
+  return cachedEngineMinJs
 }
 
 /**
