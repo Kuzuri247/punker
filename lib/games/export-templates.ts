@@ -175,3 +175,167 @@ node server.js
 Open **http://localhost:8080** in any modern web browser.
 `
 }
+
+/**
+ * Architectural template configuration for desktop electron shell
+ */
+export const DESKTOP_MAIN_JS_TEMPLATE = `const { app, BrowserWindow } = require('electron');
+const path = require('path');
+
+function createWindow() {
+  const win = new BrowserWindow({
+    width: 1280,
+    height: 720,
+    resizable: true,
+    fullscreenable: true,
+    autoHideMenuBar: true,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true
+    }
+  });
+
+  win.loadFile(path.join(__dirname, 'index.html'));
+}
+
+app.whenReady().then(createWindow);
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') app.quit();
+});
+`;
+
+export const DESKTOP_PACKAGE_JSON = (title: string, version: string = "1.0.0") => ({
+  name: title.toLowerCase().replace(/[^a-z0-9]/g, "-"),
+  version,
+  main: "main.js",
+  description: `Built with Punker Game Engine`,
+  dependencies: {},
+  devDependencies: {
+    electron: "^33.0.0",
+    "electron-builder": "^25.1.8",
+  },
+});
+
+/**
+ * Sanitizing HTML wrapper for standalone exports:
+ * - Fullscreen canvas scaling with CSS aspect-ratio containment
+ * - Auto-focus on canvas load to capture keyboard/gamepad inputs immediately
+ * - Web Audio unlock on initial user touch or keypress
+ * - Strips sandbox-only debugging hooks
+ * - Maps imports to offline bundled scripts
+ */
+export function normalizeExportHtml(
+  rawHtml: string,
+  options: {
+    title?: string
+    offlineImportMap?: boolean
+  } = {}
+): string {
+  const { title = "Punker Game", offlineImportMap = true } = options
+  let html = rawHtml
+
+  // Strip sandbox/preview only scripts
+  html = html.replace(/<script[^>]*src=["']\.\/report\.js["'][^>]*><\/script>/gi, "")
+  html = html.replace(/<script[^>]*src=["']\.\/welcome\.js["'][^>]*><\/script>/gi, "")
+
+  // Normalize page title
+  if (/<title>.*?<\/title>/i.test(html)) {
+    html = html.replace(/<title>.*?<\/title>/i, `<title>${title}</title>`)
+  }
+
+  // Configure offline-first importmap
+  if (offlineImportMap) {
+    const offlineImports = {
+      three: "./three.module.js",
+      "three/": "./",
+      "punker-engine": "./punker-engine.min.js",
+      "./engine/index.js": "./punker-engine.min.js",
+      "./engine/": "./engine/",
+    }
+
+    if (/<script[^>]*type=["']importmap["'][^>]*>[\s\S]*?<\/script>/i.test(html)) {
+      html = html.replace(
+        /<script[^>]*type=["']importmap["'][^>]*>[\s\S]*?<\/script>/i,
+        `<script type="importmap">
+${JSON.stringify({ imports: offlineImports }, null, 2)}
+</script>`
+      )
+    }
+  }
+
+  // Fullscreen canvas scaling with CSS aspect-ratio containment
+  const containmentStyle = `
+  <style id="punker-standalone-scaling">
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0a0a0a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+    }
+    canvas {
+      display: block;
+      width: 100% !important;
+      height: 100% !important;
+      max-width: 100vw;
+      max-height: 100vh;
+      aspect-ratio: 16 / 9;
+      object-fit: contain;
+      outline: none;
+    }
+  </style>`
+
+  // Auto-focus on canvas load & Web Audio unlock on initial user touch or keypress
+  const runtimeBootstrap = `
+  <script id="punker-standalone-bootstrap">
+    function autoFocusCanvas() {
+      const canvas = document.querySelector('canvas');
+      if (canvas) {
+        if (!canvas.hasAttribute('tabindex')) {
+          canvas.setAttribute('tabindex', '0');
+        }
+        canvas.focus();
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', autoFocusCanvas);
+    window.addEventListener('load', autoFocusCanvas);
+    document.addEventListener('pointerdown', autoFocusCanvas);
+    document.addEventListener('keydown', autoFocusCanvas);
+
+    (function initAudioUnlock() {
+      const events = ['touchstart', 'touchend', 'pointerdown', 'mousedown', 'keydown'];
+      function unlock() {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (AudioCtx) {
+          if (window.__punkerAudio && typeof window.__punkerAudio.resume === 'function') {
+            window.__punkerAudio.resume();
+          }
+        }
+        for (const evt of events) {
+          window.removeEventListener(evt, unlock, true);
+        }
+      }
+      for (const evt of events) {
+        window.addEventListener(evt, unlock, { capture: true, passive: true });
+      }
+    })();
+  </script>`
+
+  if (/<\/head>/i.test(html)) {
+    html = html.replace(/<\/head>/i, `${containmentStyle}\n${runtimeBootstrap}\n</head>`)
+  } else {
+    html = `${containmentStyle}\n${runtimeBootstrap}\n${html}`
+  }
+
+  return html
+}
+
