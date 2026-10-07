@@ -85,7 +85,7 @@ export function ModelPicker({
               <span className="font-sans font-medium text-foreground tracking-tight">{selected?.name ?? modelId}</span>
               {hasSelectedByok && (
                 <span title="Using custom BYOK key" className="inline-flex">
-                  <ShieldCheck className="size-3 text-emerald-500" />
+                  <ShieldCheck className="size-3 text-cyan-500" />
                 </span>
               )}
               <ChevronDownIcon className="size-3 text-foreground/80" />

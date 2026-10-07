@@ -23,17 +23,14 @@ export function LandingHeader({
             <Image
               src="/logo.svg"
               alt="Punker"
-              width={22}
-              height={22}
-              className="size-5.5"
+              width={32}
+              height={32}
+              className="size-8"
             />
-            <span className="font-logo text-lg tracking-tight text-foreground">Punker</span>
+            <span className="tracking-tight font-semibold text-lg font-mono text-foreground">Punker</span>
           </Link>
 
-          <div className="hidden items-center gap-1.5 rounded-full border border-border/60 bg-secondary/40 px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground sm:flex">
-            <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span>Autonomous Three.js Studio</span>
-          </div>
+
         </div>
 
         {/* Right actions */}
