@@ -220,8 +220,8 @@ export function ChatComposer({
     >
       <InputGroup
         className={cn(
-          "rounded-2xl border border-border/80 dark:border-white/15 bg-card dark:bg-[#1e1f20] p-2.5 shadow-lg dark:shadow-2xl dark:shadow-black/70 transition-all focus-within:border-foreground/40 focus-within:ring-2 focus-within:ring-foreground/15 hover:border-border dark:hover:border-white/25",
-          isDragging && "border-foreground/60 ring-2 ring-foreground/20 bg-card dark:bg-[#1e1f20]"
+          "relative flex flex-col w-full rounded-2xl border border-white/10 bg-neutral-900/70 backdrop-blur-xl shadow-2xl transition-shadow duration-300 focus-within:border-white/20 focus-within:ring-1 focus-within:ring-indigo-500/30 p-2.5",
+          isDragging && "border-indigo-400 ring-2 ring-indigo-500/30"
         )}
       >
         {/* Render uploaded / uploading attachments */}
@@ -297,11 +297,16 @@ export function ChatComposer({
                 : placeholder
           }
           rows={1}
-          className="field-sizing-content max-h-48 min-h-12 px-3.5 pt-2.5 text-[15px] font-normal leading-relaxed text-foreground placeholder:text-muted-foreground/80 dark:placeholder:text-zinc-400"
+          className="field-sizing-content max-h-48 min-h-12 px-3.5 pt-2.5 text-[15px] font-normal leading-relaxed text-zinc-100 placeholder:text-zinc-400"
         />
 
         <InputGroupAddon align="block-end" className="gap-2 px-2 pb-1 pt-1.5">
           <ModelPicker modelId={modelId} onModelChange={onModelChange} />
+
+          <span className="flex items-center gap-1.5 text-xs text-muted-foreground font-mono">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            Ready
+          </span>
 
           {/* Attachment trigger button */}
           {gameId && (
