@@ -145,6 +145,7 @@ async function handleProxy(
       resHeaders.delete("content-security-policy")
       resHeaders.delete("x-frame-options")
       resHeaders.set("Content-Type", "text/html; charset=utf-8")
+      resHeaders.set("Cache-Control", "no-cache, no-store, must-revalidate")
       resHeaders.delete("content-length")
 
       return new Response(html, {
@@ -156,6 +157,22 @@ async function handleProxy(
     const resHeaders = new Headers(upstreamRes.headers)
     resHeaders.delete("content-security-policy")
     resHeaders.delete("x-frame-options")
+
+    const isEngineOrVendor =
+      subpath.startsWith("engine/") ||
+      subpath.includes("punker-engine") ||
+      subpath.includes("three")
+
+    if (isEngineOrVendor) {
+      // Static engine and vendor modules are immutable runtime dependencies
+      resHeaders.set(
+        "Cache-Control",
+        "public, max-age=3600, stale-while-revalidate=86400"
+      )
+    } else {
+      // Dynamic user game assets/scripts: revalidate on each preview reload
+      resHeaders.set("Cache-Control", "no-cache")
+    }
 
     return new Response(upstreamRes.body, {
       status: upstreamRes.status,

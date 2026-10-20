@@ -59,9 +59,15 @@ export function GameChat({
 
   const router = useRouter()
 
-  // Session Re-attachment: Reconnect to active environments across page reloads
+  // Predictive Session Attachment: automatically start preview if a sandbox already exists
+  // for this game or if the session was recently active
   useEffect(() => {
     try {
+      if (sandboxId) {
+        setIsStarted(true)
+        return
+      }
+
       const stored = sessionStorage.getItem(`punker_active_sandbox_${gameId}`)
       if (stored) {
         const parsed = JSON.parse(stored)
@@ -71,7 +77,7 @@ export function GameChat({
         }
       }
     } catch (_) {}
-  }, [gameId])
+  }, [gameId, sandboxId])
 
   useEffect(() => {
     if (isStarted) {
