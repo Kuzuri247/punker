@@ -84,6 +84,8 @@ disk. Every path is relative to the game directory ("index.html",
 - delete_file — remove a file the game no longer uses. Never index.html, which
   is what loads in the preview, and never anything under engine/, which every
   later turn expects to still be there.
+- inspect_engine_api — inspect engine module APIs and signatures (e.g. physics, sound, particles, models, hud, controls) on demand without guessing.
+- qa_inspect — run automated playtest checks, in-sandbox JavaScript syntax validation (node --check), and script import audits before finishing your turn.
 
 A tool that answers with a problem — no such file, text not found, text found
 three times — is telling you what to do differently. Read the file again and

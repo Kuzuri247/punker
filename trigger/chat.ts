@@ -1,5 +1,5 @@
 import { chat } from "@trigger.dev/sdk/ai"
-import { stepCountIs } from "ai"
+import { generateText, pruneMessages, stepCountIs } from "ai"
 import { z } from "zod"
 
 import { deductCredits, getEntitlements } from "@/lib/billing/entitlements"
@@ -18,6 +18,7 @@ import {
 } from "@/lib/games/chat-store"
 import { gameInstructions } from "@/lib/games/instructions"
 import { DEFAULT_GAME_MODEL_ID, GAME_MODELS } from "@/lib/games/model-catalog"
+import { google } from "@/lib/games/models"
 import { describeError, elapsed, logger } from "@/lib/observability"
 import { createGameTools } from "@/lib/games/tools"
 
@@ -48,11 +49,57 @@ export const gameChat = chat.agent({
   clientDataSchema: gameClientDataSchema,
   storage: gameTranscriptStorage,
   cacheControl: { type: "ephemeral" },
+  systemProviderOptions: {
+    anthropic: { cacheControl: { type: "ephemeral" } },
+  },
+  compaction: {
+    shouldCompact: ({ totalTokens }) => (totalTokens ?? 0) > 60_000,
+    summarize: async ({ messages }) => {
+      const { text } = await generateText({
+        model: google("gemini-3.5-flash-lite"),
+        instructions:
+          "You are an expert game development lead summarizing an ongoing game design and development thread. " +
+          "Produce a concise summary containing: (1) Core game premise, mechanics, and design choices settled, " +
+          "(2) Files and systems implemented so far in the sandbox, and " +
+          "(3) Any current bug, runtime crash, or pending user request. " +
+          "Keep it under 300 words.",
+        messages: [
+          ...messages,
+          {
+            role: "user",
+            content: "Provide a comprehensive but compact summary of the conversation so far.",
+          },
+        ],
+      })
+      return text
+    },
+    compactModelMessages: ({ modelMessages, summary }) => [
+      {
+        role: "user",
+        content: `[Previous Game Development Summary & State]:\n${summary}`,
+      },
+      ...modelMessages.slice(-3),
+    ],
+  },
   prepareMessages: async ({ messages }) => {
     if (messages.length === 0) return messages
-    const last = messages[messages.length - 1]
+
+    // Prune stale read_file and list_files calls/results from older turns
+    // so historical 128KB file reads don't bloat the context window.
+    const pruned = pruneMessages({
+      messages,
+      toolCalls: [
+        {
+          type: "before-last-4-messages",
+          tools: ["read_file", "list_files"],
+        },
+      ],
+    })
+
+    const candidates = pruned.length > 0 ? pruned : messages
+    const last = candidates[candidates.length - 1]
     return [
-      ...messages.slice(0, -1),
+      ...candidates.slice(0, -1),
       {
         ...last,
         providerOptions: {
@@ -280,8 +327,12 @@ export const gameChat = chat.agent({
           )
         }
 
-        // Gentle pacing between tool-loop steps to smooth out Free Tier RPM consumption
-        await new Promise((resolve) => setTimeout(resolve, 1200))
+        // Gentle pacing between tool-loop steps ONLY to smooth out Google Free Tier 20 RPM consumption.
+        // Paid tiers (Pro, Studio, BYOK) and non-Gemini models (Claude, OpenAI) run without artificial delay.
+        const isGemini = modelId.startsWith("gemini-")
+        if (!hasByok && isGemini && entitlements.tier === "free") {
+          await new Promise((resolve) => setTimeout(resolve, 1000))
+        }
       },
     })
   },

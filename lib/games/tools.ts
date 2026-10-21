@@ -249,11 +249,16 @@ export function createGameTools(gameId: string) {
             return `${relative(target)} is ${info.size} bytes, over the ${MAX_FILE_BYTES} byte limit. Split it into smaller modules.`
           }
 
-          const content = (await box.fs.downloadFile(target)).toString("utf8")
+          const rawContent = (await box.fs.downloadFile(target)).toString("utf8")
+          // Normalize line breaks to avoid CRLF/LF mismatches between Windows and Linux
+          const content = rawContent.replace(/\r\n/g, "\n")
+          const normalizedFind = find.replace(/\r\n/g, "\n")
+          const normalizedReplace = replace.replace(/\r\n/g, "\n")
+
           // Splitting on the literal counts occurrences and does the
           // replacement in one pass, with none of `String.replace`'s
           // interpretation of `$&` and friends in the replacement.
-          const parts = content.split(find)
+          const parts = content.split(normalizedFind)
           const occurrences = parts.length - 1
 
           if (occurrences === 0) {
@@ -265,8 +270,8 @@ export function createGameTools(gameId: string) {
           }
 
           const updated = replaceAll
-            ? parts.join(replace)
-            : content.replace(find, () => replace)
+            ? parts.join(normalizedReplace)
+            : content.replace(normalizedFind, () => normalizedReplace)
 
           await box.fs.uploadFile(Buffer.from(updated, "utf8"), target)
 
@@ -349,7 +354,7 @@ export function createGameTools(gameId: string) {
 
     qa_inspect: tool({
       description:
-        "Run QA and automated playtest inspections on the game in the sandbox. Inspects index.html, validates JavaScript script references, checks for syntax errors, and verifies Three.js canvas setup.",
+        "Run QA and automated playtest inspections on the game in the sandbox. Inspects index.html, runs real in-sandbox JavaScript syntax validation (node --check), verifies script imports, and checks Three.js canvas setup.",
       inputSchema: z.object({
         focus: z
           .enum(["full", "syntax", "canvas", "controls"])
@@ -371,27 +376,113 @@ export function createGameTools(gameId: string) {
           ).toString("utf8")
           const checks: string[] = []
 
-          // Check 1: HTML structure
+          // Check 1: In-sandbox JavaScript syntax validation via node --check
+          const syntaxCheck = await box.process.executeCommand(
+            `node -e '
+              const fs = require("fs");
+              const path = require("path");
+              const { execSync } = require("child_process");
+              const gameDir = "${GAME_DIR}";
+
+              function findJs(dir) {
+                let list = [];
+                for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+                  if (entry.name === "engine" || entry.name.startsWith(".")) continue;
+                  const full = path.join(dir, entry.name);
+                  if (entry.isDirectory()) list = list.concat(findJs(full));
+                  else if (entry.isFile() && entry.name.endsWith(".js") && entry.name !== "report.js") list.push(full);
+                }
+                return list;
+              }
+
+              const files = findJs(gameDir);
+              const errors = [];
+              for (const f of files) {
+                try {
+                  execSync("node --check \\"" + f + "\\"", { stdio: "pipe" });
+                } catch (e) {
+                  errors.push(path.relative(gameDir, f) + ": " + (e.stderr ? e.stderr.toString().trim() : e.message));
+                }
+              }
+
+              if (errors.length > 0) {
+                console.error("SYNTAX_FAIL:\\n" + errors.join("\\n"));
+                process.exit(1);
+              }
+              console.log("SYNTAX_OK (" + files.length + " files checked)");
+            '`
+          )
+
+          if (syntaxCheck.exitCode !== 0) {
+            if (syntaxCheck.result.includes("SYNTAX_FAIL")) {
+              return `QA Syntax Check FAILED:\n${syntaxCheck.result}\nFix these syntax errors immediately using replace_text or write_file.`
+            }
+            checks.push(
+              `Warning: JavaScript syntax verification could not run (${syntaxCheck.result.trim() || "checker startup failed"}).`
+            )
+          } else {
+            checks.push(
+              "JavaScript syntax verified across all game scripts via node --check."
+            )
+          }
+
+          // Check 2: HTML structure & canvas
           if (
             !indexContent.includes("<canvas") &&
             !indexContent.includes("canvas")
           ) {
             checks.push(
-              "Warning: No canvas element or canvas creation found in index.html."
+              "Warning: No explicit canvas element or canvas creation found in index.html."
             )
           } else {
             checks.push("Canvas render target verified.")
           }
 
-          // Check 2: Script tags
-          const scriptMatches = indexContent.match(/src=["'](.*?)["']/g)
-          if (scriptMatches) {
-            checks.push(
-              `Verified ${scriptMatches.length} script/asset reference(s).`
-            )
+          // Check 3: Script tags and local file existence
+          const scriptMatches = [...indexContent.matchAll(/src=["'](.*?)["']/g)]
+          const missingScripts: string[] = []
+          for (const match of scriptMatches) {
+            const src = match[1]
+            if (!src || src.trim() === "") continue
+
+            // Skip protocol-relative and scheme-based URLs
+            if (src.startsWith("//") || /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(src)) {
+              continue
+            }
+
+            // Remove query strings, fragments, and an optional leading ./ or /
+            const withoutQueryOrHash = src.split(/[?#]/)[0]
+            const normalized = withoutQueryOrHash.replace(/^\.?\//, "").trim()
+            if (!normalized) continue
+
+            try {
+              const scriptPath = resolveGamePath(normalized)
+              if (!(await statFile(box, scriptPath))) {
+                missingScripts.push(src)
+              }
+            } catch (err) {
+              if (err instanceof ToolInputError) {
+                missingScripts.push(src)
+              } else {
+                throw err
+              }
+            }
           }
 
-          // Check 3: Audio context
+          if (missingScripts.length > 0) {
+            return `QA Alert: Referenced script file(s) missing from game directory:\n- ${missingScripts.join("\n- ")}\nPlease create them or correct the script path in index.html.`
+          }
+          checks.push(
+            `Verified ${scriptMatches.length} script/asset reference(s) and local file existence.`
+          )
+
+          // Check 4: Three.js WebGL and audio detection
+          if (
+            indexContent.includes("three") ||
+            indexContent.includes("THREE")
+          ) {
+            checks.push("Three.js WebGL engine detected.")
+          }
           if (
             indexContent.includes("AudioContext") ||
             indexContent.includes("game.audio")
@@ -399,15 +490,48 @@ export function createGameTools(gameId: string) {
             checks.push("Audio feedback system detected.")
           }
 
-          // Check 4: Three.js
-          if (
-            indexContent.includes("three") ||
-            indexContent.includes("THREE")
-          ) {
-            checks.push("Three.js WebGL engine detected.")
+          return `QA Playtest Audit Passed (${focus ?? "full"}):\n- ${checks.join("\n- ")}\n60 FPS baseline target verified.`
+        }),
+    }),
+
+    inspect_engine_api: tool({
+      description:
+        "Inspect the built-in Three.js game engine API and subsystem documentation on demand. Use when you need exact function signatures, parameters, or usage examples for engine modules (e.g. 'physics', 'models', 'lighting', 'materials', 'sound', 'hud', 'controls', 'animation', 'particles', 'postfx', 'state', 'math').",
+      inputSchema: z.object({
+        module: z
+          .enum([
+            "index",
+            "physics",
+            "models",
+            "lighting",
+            "materials",
+            "sound",
+            "hud",
+            "controls",
+            "input",
+            "animation",
+            "particles",
+            "postfx",
+            "state",
+            "math",
+            "engine",
+          ])
+          .describe(
+            "The engine module to inspect for signatures, options, and APIs."
+          ),
+      }),
+      execute: ({ module: mod }) =>
+        expected("inspect_engine_api", gameId, mod, async () => {
+          const target = resolveGamePath(`engine/${mod}.js`)
+          const box = await sandbox()
+          const info = await statFile(box, target)
+
+          if (!info) {
+            return `No engine module at engine/${mod}.js.`
           }
 
-          return `QA Playtest Audit Passed (${focus ?? "full"}):\n- ${checks.join("\n- ")}\n60 FPS baseline target verified.`
+          const content = (await box.fs.downloadFile(target)).toString("utf8")
+          return content
         }),
     }),
 

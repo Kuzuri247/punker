@@ -63,8 +63,20 @@ export async function createGameSandbox(
 
   await sandbox.fs.createFolder(GAME_DIR, "755")
 
+  // Group folders by depth so parent folders are created before nested children,
+  // while sibling folders at the same depth run in parallel.
+  const depthMap = new Map<number, string[]>()
   for (const folder of folders) {
-    await sandbox.fs.createFolder(folder, "755")
+    const depth = folder.split("/").length
+    const list = depthMap.get(depth) ?? []
+    list.push(folder)
+    depthMap.set(depth, list)
+  }
+
+  const sortedDepths = [...depthMap.keys()].sort((a, b) => a - b)
+  for (const depth of sortedDepths) {
+    const layer = depthMap.get(depth)!
+    await Promise.all(layer.map((folder) => sandbox.fs.createFolder(folder, "755")))
   }
 
   // One request for the whole tree rather than one per file, so seeding costs
@@ -288,12 +300,81 @@ export async function startGameServer(
   const alreadyServing = await serverResponds(sandbox)
 
   if (!alreadyServing) {
-    // `nohup … &` hands the server off to init and closes the pipes the exec
-    // is waiting on, so this returns instead of blocking for the server's
-    // lifetime. The log is where to look when a preview comes back empty.
-    await sandbox.process.executeCommand(
-      `nohup python3 -m http.server ${PREVIEW_PORT} --directory ${GAME_DIR} > ${SERVER_LOG} 2>&1 &`
-    )
+    // High-concurrency asynchronous Node.js static server with CORS, proper MIME types,
+    // and non-blocking streaming. Falls back to python3 -m http.server if node is unavailable.
+    const spawnServerCmd = `
+      if command -v node >/dev/null 2>&1; then
+        nohup node -e '
+          const http = require("http"), fs = require("fs"), path = require("path");
+          const MIME = {
+            ".html": "text/html; charset=utf-8",
+            ".js": "application/javascript; charset=utf-8",
+            ".mjs": "application/javascript; charset=utf-8",
+            ".css": "text/css; charset=utf-8",
+            ".json": "application/json; charset=utf-8",
+            ".png": "image/png",
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".svg": "image/svg+xml",
+            ".mp3": "audio/mpeg",
+            ".wav": "audio/wav",
+            ".glb": "model/gltf-binary",
+            ".wasm": "application/wasm"
+          };
+          const srv = http.createServer((req, res) => {
+            try {
+              res.setHeader("Access-Control-Allow-Origin", "*");
+              res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+              if (req.method === "OPTIONS") { res.writeHead(204); return res.end(); }
+              let u;
+              try {
+                u = decodeURIComponent(req.url.split("?")[0] || "/");
+              } catch (_) {
+                res.writeHead(400);
+                return res.end("Bad Request");
+              }
+              const baseDir = "${GAME_DIR}";
+              let p = path.normalize(path.join(baseDir, u));
+              if (p !== baseDir && !p.startsWith(baseDir + path.sep)) {
+                res.writeHead(403);
+                return res.end("Forbidden");
+              }
+              try {
+                if (fs.existsSync(p) && fs.statSync(p).isDirectory()) p = path.join(p, "index.html");
+              } catch (_) {
+                res.writeHead(500);
+                return res.end("Internal Server Error");
+              }
+              if (!fs.existsSync(p)) { res.writeHead(404); return res.end("Not Found"); }
+              const ext = path.extname(p).toLowerCase();
+              res.setHeader("Content-Type", MIME[ext] || "application/octet-stream");
+              const isEngineOrVendor = u.startsWith("/engine/") || u === "/punker-engine.min.js" || u === "/three.module.js";
+              if (isEngineOrVendor) res.setHeader("Cache-Control", "private, max-age=3600");
+              else res.setHeader("Cache-Control", "no-cache");
+              if (req.method === "HEAD") { res.writeHead(200); return res.end(); }
+              const stream = fs.createReadStream(p);
+              stream.on("error", (err) => {
+                if (!res.headersSent) {
+                  res.writeHead(err.code === "ENOENT" ? 404 : 500);
+                }
+                res.end();
+              });
+              stream.pipe(res);
+            } catch (_) {
+              if (!res.headersSent) {
+                res.writeHead(500);
+              }
+              res.end();
+            }
+          });
+          srv.listen(${PREVIEW_PORT}, "0.0.0.0", () => console.log("Node server ready on port ${PREVIEW_PORT}"));
+        ' > ${SERVER_LOG} 2>&1 &
+      else
+        nohup python3 -m http.server ${PREVIEW_PORT} --directory ${GAME_DIR} > ${SERVER_LOG} 2>&1 &
+      fi
+    `.trim()
+
+    await sandbox.process.executeCommand(spawnServerCmd)
 
     // Binding the port takes a moment longer than spawning does, and a url
     // handed back before then loads as a connection error in the iframe.
