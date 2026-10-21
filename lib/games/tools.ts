@@ -414,9 +414,17 @@ export function createGameTools(gameId: string) {
           )
 
           if (syntaxCheck.exitCode !== 0) {
-            return `QA Syntax Check FAILED:\n${syntaxCheck.result}\nFix these syntax errors immediately using replace_text or write_file.`
+            if (syntaxCheck.result.includes("SYNTAX_FAIL")) {
+              return `QA Syntax Check FAILED:\n${syntaxCheck.result}\nFix these syntax errors immediately using replace_text or write_file.`
+            }
+            checks.push(
+              `Warning: JavaScript syntax verification could not run (${syntaxCheck.result.trim() || "checker startup failed"}).`
+            )
+          } else {
+            checks.push(
+              "JavaScript syntax verified across all game scripts via node --check."
+            )
           }
-          checks.push("JavaScript syntax verified across all game scripts via node --check.")
 
           // Check 2: HTML structure & canvas
           if (
@@ -435,11 +443,28 @@ export function createGameTools(gameId: string) {
           const missingScripts: string[] = []
           for (const match of scriptMatches) {
             const src = match[1]
-            if (src && !src.startsWith("http://") && !src.startsWith("https://") && !src.startsWith("data:")) {
-              const cleanedSrc = src.replace(/^\.\//, "")
-              const scriptPath = resolveGamePath(cleanedSrc)
+            if (!src || src.trim() === "") continue
+
+            // Skip protocol-relative and scheme-based URLs
+            if (src.startsWith("//") || /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(src)) {
+              continue
+            }
+
+            // Remove query strings, fragments, and an optional leading ./ or /
+            const withoutQueryOrHash = src.split(/[?#]/)[0]
+            const normalized = withoutQueryOrHash.replace(/^\.?\//, "").trim()
+            if (!normalized) continue
+
+            try {
+              const scriptPath = resolveGamePath(normalized)
               if (!(await statFile(box, scriptPath))) {
                 missingScripts.push(src)
+              }
+            } catch (err) {
+              if (err instanceof ToolInputError) {
+                missingScripts.push(src)
+              } else {
+                throw err
               }
             }
           }

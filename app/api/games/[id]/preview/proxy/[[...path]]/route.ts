@@ -160,17 +160,17 @@ async function handleProxy(
 
     const isEngineOrVendor =
       subpath.startsWith("engine/") ||
-      subpath.includes("punker-engine") ||
-      subpath.includes("three")
+      subpath === "punker-engine.min.js" ||
+      subpath === "three.module.js"
 
-    if (isEngineOrVendor) {
+    if (upstreamRes.ok && isEngineOrVendor) {
       // Static engine and vendor modules are immutable runtime dependencies
       resHeaders.set(
         "Cache-Control",
-        "public, max-age=3600, stale-while-revalidate=86400"
+        "private, max-age=3600, stale-while-revalidate=86400"
       )
     } else {
-      // Dynamic user game assets/scripts: revalidate on each preview reload
+      // Dynamic user game assets/scripts or non-2xx responses: revalidate on each preview reload
       resHeaders.set("Cache-Control", "no-cache")
     }
 

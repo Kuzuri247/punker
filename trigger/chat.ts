@@ -78,7 +78,7 @@ export const gameChat = chat.agent({
         role: "user",
         content: `[Previous Game Development Summary & State]:\n${summary}`,
       },
-      ...modelMessages.slice(-2),
+      ...modelMessages.slice(-3),
     ],
   },
   prepareMessages: async ({ messages }) => {

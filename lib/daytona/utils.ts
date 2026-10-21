@@ -322,20 +322,50 @@ export async function startGameServer(
             ".wasm": "application/wasm"
           };
           const srv = http.createServer((req, res) => {
-            res.setHeader("Access-Control-Allow-Origin", "*");
-            res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
-            if (req.method === "OPTIONS") { res.writeHead(204); return res.end(); }
-            const u = decodeURIComponent(req.url.split("?")[0] || "/");
-            let p = path.normalize(path.join("${GAME_DIR}", u));
-            if (!p.startsWith("${GAME_DIR}")) { res.writeHead(403); return res.end("Forbidden"); }
-            if (fs.existsSync(p) && fs.statSync(p).isDirectory()) p = path.join(p, "index.html");
-            if (!fs.existsSync(p)) { res.writeHead(404); return res.end("Not Found"); }
-            const ext = path.extname(p).toLowerCase();
-            res.setHeader("Content-Type", MIME[ext] || "application/octet-stream");
-            if (u.includes("/engine/") || u.includes("three")) res.setHeader("Cache-Control", "public, max-age=3600");
-            else res.setHeader("Cache-Control", "no-cache");
-            if (req.method === "HEAD") { res.writeHead(200); return res.end(); }
-            fs.createReadStream(p).pipe(res);
+            try {
+              res.setHeader("Access-Control-Allow-Origin", "*");
+              res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+              if (req.method === "OPTIONS") { res.writeHead(204); return res.end(); }
+              let u;
+              try {
+                u = decodeURIComponent(req.url.split("?")[0] || "/");
+              } catch (_) {
+                res.writeHead(400);
+                return res.end("Bad Request");
+              }
+              const baseDir = "${GAME_DIR}";
+              let p = path.normalize(path.join(baseDir, u));
+              if (p !== baseDir && !p.startsWith(baseDir + path.sep)) {
+                res.writeHead(403);
+                return res.end("Forbidden");
+              }
+              try {
+                if (fs.existsSync(p) && fs.statSync(p).isDirectory()) p = path.join(p, "index.html");
+              } catch (_) {
+                res.writeHead(500);
+                return res.end("Internal Server Error");
+              }
+              if (!fs.existsSync(p)) { res.writeHead(404); return res.end("Not Found"); }
+              const ext = path.extname(p).toLowerCase();
+              res.setHeader("Content-Type", MIME[ext] || "application/octet-stream");
+              const isEngineOrVendor = u.startsWith("/engine/") || u === "/punker-engine.min.js" || u === "/three.module.js";
+              if (isEngineOrVendor) res.setHeader("Cache-Control", "private, max-age=3600");
+              else res.setHeader("Cache-Control", "no-cache");
+              if (req.method === "HEAD") { res.writeHead(200); return res.end(); }
+              const stream = fs.createReadStream(p);
+              stream.on("error", (err) => {
+                if (!res.headersSent) {
+                  res.writeHead(err.code === "ENOENT" ? 404 : 500);
+                }
+                res.end();
+              });
+              stream.pipe(res);
+            } catch (_) {
+              if (!res.headersSent) {
+                res.writeHead(500);
+              }
+              res.end();
+            }
           });
           srv.listen(${PREVIEW_PORT}, "0.0.0.0", () => console.log("Node server ready on port ${PREVIEW_PORT}"));
         ' > ${SERVER_LOG} 2>&1 &
