@@ -3,11 +3,12 @@ import { ArrowRight, Sparkles } from "lucide-react"
 import Link from "next/link"
 
 import { ChatGradientBackground } from "@/components/chat-gradient-background"
-import { InteractiveStudioDemo } from "@/components/landing/interactive-studio-demo"
+import { ImmersiveSandbox } from "@/components/landing/immersive-sandbox"
 import { LandingArchitecture } from "@/components/landing/landing-architecture"
 import { LandingComposer } from "@/components/landing/landing-composer"
 import { LandingFooter } from "@/components/landing/landing-footer"
 import { LandingHeader } from "@/components/landing/landing-header"
+import { StripeMeshGradient } from "@/components/ui/stripe-mesh-gradient"
 import { buttonVariants } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
@@ -23,6 +24,7 @@ export default async function LandingPage() {
       <main className="relative z-10 flex-1 flex flex-col items-center">
         {/* Hero Section */}
         <section className="relative w-full pt-12 pb-16 sm:pt-20 sm:pb-20 overflow-hidden px-4">
+          <StripeMeshGradient />
           <ChatGradientBackground />
 
           <div className="relative z-10 mx-auto max-w-4xl text-center space-y-6">
@@ -49,19 +51,19 @@ export default async function LandingPage() {
           </div>
         </section>
 
-        {/* Interactive Studio Preview Section */}
+        {/* Single Immersive Sandbox Preview Section */}
         <section className="w-full px-4 sm:px-6 py-6 sm:py-10">
           <div className="mx-auto max-w-6xl space-y-4">
             <div className="flex flex-col items-center text-center space-y-1 mb-6">
-              <span className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
-                Live Studio Interface
+              <span className="text-xs font-mono uppercase tracking-wider text-cyan-400">
+                Live Engine Sandbox
               </span>
               <h2 className="font-heading text-2xl sm:text-3xl font-medium tracking-tight text-foreground">
-                Chat on the left, playable 3D on the right
+                Autonomous Three.js Runtime
               </h2>
             </div>
 
-            <InteractiveStudioDemo />
+            <ImmersiveSandbox userId={userId} />
           </div>
         </section>
 

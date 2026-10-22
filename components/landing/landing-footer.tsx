@@ -22,7 +22,6 @@ export function LandingFooter() {
 
         {/* Status indicator */}
         <div className="flex items-center gap-2">
-          <span className="size-1.5 rounded-full bg-emerald-500" />
           <span className="text-[11px]">Three.js runtime active</span>
         </div>
 

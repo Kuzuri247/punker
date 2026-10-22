@@ -1,6 +1,6 @@
 "use client"
 
-import { ArrowUpIcon, Dices, Sparkles } from "lucide-react"
+import { ArrowUpIcon, Dices } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
 
@@ -21,26 +21,45 @@ import { cn } from "@/lib/utils"
 
 export function LandingComposer({
   userId,
+  value,
+  onValueChange,
+  className,
+  showSuggestions = true,
 }: {
   userId?: string | null
+  value?: string
+  onValueChange?: (val: string) => void
+  className?: string
+  showSuggestions?: boolean
 }) {
   const router = useRouter()
-  const [prompt, setPrompt] = useState("")
+  const [internalPrompt, setInternalPrompt] = useState("")
   const [modelId, setModelId] = useState<GameModelId>(DEFAULT_GAME_MODEL_ID)
   const [templateIndex, setTemplateIndex] = useState(-1)
   const [isRolling, setIsRolling] = useState(false)
   const [isPending, startTransition] = useTransition()
+
+  const isControlled = value !== undefined
+  const prompt = isControlled ? value : internalPrompt
+
+  function updatePrompt(newVal: string) {
+    if (isControlled) {
+      onValueChange?.(newVal)
+    } else {
+      setInternalPrompt(newVal)
+    }
+  }
 
   function handleCycleTemplate() {
     setIsRolling(true)
     setTimeout(() => setIsRolling(false), 350)
     const nextIndex = (templateIndex + 1) % suggestions.length
     setTemplateIndex(nextIndex)
-    setPrompt(suggestions[nextIndex].prompt)
+    updatePrompt(suggestions[nextIndex].prompt)
   }
 
   function handleSelectSuggestion(suggestionPrompt: string) {
-    setPrompt(suggestionPrompt)
+    updatePrompt(suggestionPrompt)
   }
 
   function handleSubmit(e?: React.FormEvent) {
@@ -65,17 +84,15 @@ export function LandingComposer({
   const canSubmit = prompt.trim().length > 0 && !isPending
 
   return (
-    <div className="mx-auto w-full max-w-2xl space-y-3.5">
+    <div className={cn("mx-auto w-full max-w-2xl space-y-3.5", className)}>
       <form onSubmit={handleSubmit} className="relative w-full">
         <InputGroup
-          className={cn(
-            "rounded-2xl border border-border/80 dark:border-white/15 bg-card dark:bg-[#1e1f20] p-2.5 shadow-lg dark:shadow-2xl dark:shadow-black/70 transition-all focus-within:border-foreground/40 focus-within:ring-2 focus-within:ring-foreground/15 hover:border-border dark:hover:border-white/25"
-          )}
+          className="relative flex flex-col w-full rounded-2xl border border-border/80 dark:border-white/10 bg-card/90 dark:bg-[#15161c]/90 backdrop-blur-xl shadow-xl dark:shadow-2xl transition-all duration-300 focus-within:border-cyan-500/40 focus-within:ring-2 focus-within:ring-cyan-500/20 p-2.5"
         >
           <InputGroupTextarea
             name="prompt"
             value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
+            onChange={(e) => updatePrompt(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault()
@@ -85,11 +102,15 @@ export function LandingComposer({
             disabled={isPending}
             placeholder="Describe the 3D game you want to build…"
             rows={2}
-            className="field-sizing-content max-h-48 min-h-14 px-3.5 pt-2 text-[15px] font-normal leading-relaxed text-foreground placeholder:text-muted-foreground/80 dark:placeholder:text-zinc-400"
+            className="field-sizing-content max-h-48 min-h-14 px-3.5 pt-2 text-[15px] font-normal leading-relaxed text-foreground placeholder:text-muted-foreground"
           />
 
           <InputGroupAddon align="block-end" className="gap-2 px-2 pb-1 pt-1.5">
             <ModelPicker modelId={modelId} onModelChange={setModelId} />
+
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground font-mono">
+              Ready
+            </span>
 
             <div className="ml-auto flex items-center gap-1.5">
               {/* Dice suggestion cycle */}
@@ -105,7 +126,7 @@ export function LandingComposer({
                     : "Roll a game idea"
                 }
                 aria-label="Roll a game idea"
-                className="size-8 rounded-full text-foreground hover:text-foreground bg-muted/60 hover:bg-muted dark:bg-white/10 dark:hover:bg-white/15 border border-border/60 dark:border-white/10 transition-all active:scale-90 cursor-pointer"
+                className="size-8 rounded-full text-foreground hover:text-foreground bg-white/10 hover:bg-white/15 border border-white/10 transition-all active:scale-90 cursor-pointer"
               >
                 <Dices
                   className={cn(
@@ -125,7 +146,7 @@ export function LandingComposer({
                   "size-8 rounded-full shadow-xs transition-all active:scale-95 cursor-pointer",
                   canSubmit
                     ? "bg-foreground text-background hover:bg-foreground/90 hover:shadow-md"
-                    : "bg-muted dark:bg-white/10 text-muted-foreground/60 dark:text-zinc-400/60 opacity-60 cursor-not-allowed border border-border/60 dark:border-white/10"
+                    : "bg-white/10 text-zinc-400/60 opacity-60 cursor-not-allowed border border-white/10"
                 )}
               >
                 <ArrowUpIcon className="size-4 stroke-[2.5]" />
@@ -136,23 +157,25 @@ export function LandingComposer({
       </form>
 
       {/* Suggestion Chips */}
-      <div className="flex flex-wrap items-center justify-center gap-1.5 text-xs">
-        <span className="text-muted-foreground mr-1 text-[11px]">Try an idea:</span>
-        {suggestions.slice(0, 4).map((sugg) => {
-          const Icon = sugg.icon
-          return (
-            <button
-              key={sugg.label}
-              type="button"
-              onClick={() => handleSelectSuggestion(sugg.prompt)}
-              className="cursor-pointer inline-flex items-center gap-1.5 rounded-full border border-border/60 dark:border-white/10 bg-secondary/50 dark:bg-white/5 px-2.5 py-1 text-[11px] font-normal text-muted-foreground hover:bg-secondary hover:text-foreground dark:hover:bg-white/10 transition-all active:scale-95"
-            >
-              <Icon className="size-3 text-muted-foreground/80" />
-              <span>{sugg.label}</span>
-            </button>
-          )
-        })}
-      </div>
+      {showSuggestions && (
+        <div className="flex flex-wrap items-center justify-center gap-1.5 text-xs">
+          <span className="text-muted-foreground mr-1 text-[11px]">Try an idea:</span>
+          {suggestions.slice(0, 4).map((sugg) => {
+            const Icon = sugg.icon
+            return (
+              <button
+                key={sugg.label}
+                type="button"
+                onClick={() => handleSelectSuggestion(sugg.prompt)}
+                className="cursor-pointer inline-flex items-center gap-1.5 rounded-full border border-border/80 dark:border-white/10 bg-secondary/60 dark:bg-white/5 px-2.5 py-1 text-[11px] font-normal text-muted-foreground hover:bg-secondary dark:hover:bg-white/10 hover:text-foreground transition-all active:scale-95"
+              >
+                <Icon className="size-3 text-muted-foreground/80" />
+                <span>{sugg.label}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

@@ -49,16 +49,16 @@ export function AppSidebar({
       <SidebarHeader className="flex-row items-center justify-between group-data-[collapsible=icon]:justify-center">
         <Link
           href="/"
-          className="flex items-center gap-2 group-data-[collapsible=icon]:hidden"
+          className="flex items-center gap-2.5 group-data-[collapsible=icon]:hidden"
         >
           <Image
             src="/logo.svg"
             alt="Punker"
-            width={20}
-            height={20}
-            className="size-5"
+            width={24}
+            height={24}
+            className="size-6"
           />
-          <span className="font-logo text-base">Punker</span>
+          <span className="font-mono text-base font-semibold tracking-tight text-foreground">Punker</span>
         </Link>
         <SidebarTrigger />
       </SidebarHeader>
